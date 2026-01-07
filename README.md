@@ -1,0 +1,3 @@
+# opencode-workspace
+
+Initializing...
