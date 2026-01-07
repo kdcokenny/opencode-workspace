@@ -288,6 +288,28 @@ interface SystemTransformInput {
  */
 
 // ==========================================
+// CODER TASK TRACKING FOR REVIEW TRIGGER
+// ==========================================
+
+/** Tracks in-flight coder task callIDs with timestamps for stale cleanup */
+const activeCoderCalls = new Map<string, { startTime: number }>()
+
+/** Stale call timeout - matches MAX_RUN_TIME_MS in background-agents.ts */
+const STALE_CALL_TIMEOUT_MS = 15 * 60 * 1000
+
+/** Periodic cleanup of orphaned callIDs (runs every 60s) */
+const cleanupInterval = setInterval(() => {
+	const now = Date.now()
+	for (const [callID, data] of activeCoderCalls) {
+		if (now - data.startTime > STALE_CALL_TIMEOUT_MS) {
+			activeCoderCalls.delete(callID)
+		}
+	}
+}, 60_000)
+// Prevent interval from keeping process alive
+cleanupInterval.unref?.()
+
+// ==========================================
 // RULES FOR INJECTION
 // ==========================================
 
@@ -579,29 +601,34 @@ Today is ${today}. When searching for documentation, APIs, or external resources
 			}
 		},
 
-		// Post-task hook - Inject code review reminder after coder tasks
-		"tool.execute.after": async (
-			input: { tool: string },
-			output?: { args?: { subagent_type?: string }; result?: unknown },
+		// Track coder task starts for review trigger
+		"tool.execute.before": async (
+			input: { tool: string; callID?: string },
+			output: { args?: { subagent_type?: string } },
 		) => {
-			// Guard: Only intercept task tool
 			if (input.tool !== "task") return
+			if (!input.callID) return
+			if (output.args?.subagent_type !== "coder") return
 
-			// Guard: Check if output has subagent_type
-			if (!output?.args?.subagent_type) return
+			activeCoderCalls.set(input.callID, { startTime: Date.now() })
+		},
 
-			// Guard: Only trigger for coder agent
-			const agentName = output.args.subagent_type
-			if (agentName !== "coder") return
+		// Trigger review reminder when all coder tasks complete
+		"tool.execute.after": async (input: { tool: string; callID?: string }, _output?: unknown) => {
+			if (!input.callID) return
+			if (!activeCoderCalls.has(input.callID)) return
 
-			// Return system message to append for next turn
-			return {
-				text: `<system-reminder>
-Coder task complete. If this was the final implementation step and all requested work is done, proceed to code review:
+			activeCoderCalls.delete(input.callID)
+
+			if (activeCoderCalls.size === 0) {
+				return {
+					text: `<system-reminder>
+Coder task complete. Proceed to code review:
 1. Delegate to \`reviewer\` agent with the changed files
 2. Include findings in your completion report
 3. Offer to fix any critical/major issues found
 </system-reminder>`,
+				}
 			}
 		},
 
