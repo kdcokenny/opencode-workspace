@@ -205,6 +205,10 @@ This plugin is part of the [KDCO Registry](https://github.com/kdcokenny/ocx/tree
 - [opencode-worktree](https://github.com/kdcokenny/opencode-worktree) - Isolated git worktrees for AI experiments
 - [opencode-notify](https://github.com/kdcokenny/opencode-notify) - Native OS notifications
 
+## Disclaimer
+
+This project is not built by the OpenCode team and is not affiliated with [OpenCode](https://github.com/sst/opencode) in any way.
+
 ## License
 
 MIT
