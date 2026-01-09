@@ -399,6 +399,21 @@ updated: YYYY-MM-DD
 3. **Update immediately** - Mark tasks complete right after finishing
 4. **Auto-save after approval** - When user approves your plan, immediately call \`plan_save\`. Do NOT wait for user to remind you or switch modes.
 </plan-format>
+
+<instruction name="plan_persistence" policy_level="critical">
+
+## Plan Mode Active
+You are in PLAN MODE. Your primary deliverable is a saved implementation plan.
+
+## Requirements
+1. **First**: Load the \`plan-protocol\` skill to understand the required plan schema
+2. **During**: Collaborate with the user to develop a comprehensive, well-cited plan
+3. **Before exiting**: You MUST call \`plan_save\` with the finalized plan
+
+## CRITICAL
+Saving your plan is a REQUIREMENT, not a request. Plans that are not saved will be lost when the session ends or mode changes. The user cannot see your plan unless you save it.
+
+</instruction>
 </system-reminder>`
 
 const BUILD_RULES = `<system-reminder>
@@ -555,7 +570,10 @@ export const WorkspacePlugin: Plugin = async (ctx) => {
 					// Happy path: save
 					await fs.writeFile(path.join(sessionDir, "plan.md"), args.content, "utf8")
 					const warningCount = result.warnings?.length ?? 0
-					return `Plan saved.${warningCount > 0 ? ` (${warningCount} warnings: ${result.warnings?.join(", ")})` : ""}`
+					const warningText =
+						warningCount > 0 ? ` (${warningCount} warnings: ${result.warnings?.join(", ")})` : ""
+
+					return `Plan saved.${warningText}`
 				},
 			}),
 
@@ -613,22 +631,36 @@ Today is ${today}. When searching for documentation, APIs, or external resources
 			activeCoderCalls.set(input.callID, { startTime: Date.now() })
 		},
 
-		// Trigger review reminder when all coder tasks complete
-		"tool.execute.after": async (input: { tool: string; callID?: string }, _output?: unknown) => {
+		// Trigger review reminder when plan_save or all coder tasks complete
+		"tool.execute.after": async (
+			input: { tool: string; sessionID: string; callID: string },
+			output: { title: string; output: string; metadata: unknown },
+		) => {
+			// Plan save triggers reviewer delegation reminder
+			if (input.tool === "plan_save") {
+				output.output += `\n\n<system-reminder>
+Plan saved successfully. You MUST now delegate to the reviewer:
+1. Use the \`delegate\` tool to send the plan to the \`reviewer\` agent
+2. The reviewer will load \`plan-review\` and \`code-philosophy\` skills
+3. Use \`plan_read\` to get the plan content for the delegation prompt
+4. This is NON-BLOCKING - continue work while review runs in background
+</system-reminder>`
+				return
+			}
+
+			// Coder task completion tracking
 			if (!input.callID) return
 			if (!activeCoderCalls.has(input.callID)) return
 
 			activeCoderCalls.delete(input.callID)
 
 			if (activeCoderCalls.size === 0) {
-				return {
-					text: `<system-reminder>
+				output.output += `\n\n<system-reminder>
 Coder task complete. Proceed to code review:
 1. Delegate to \`reviewer\` agent with the changed files
 2. Include findings in your completion report
 3. Offer to fix any critical/major issues found
-</system-reminder>`,
-				}
+</system-reminder>`
 			}
 		},
 
