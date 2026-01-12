@@ -319,9 +319,11 @@ function formatZodErrors(error: z.ZodError): string {
 
 		// Provide helpful context based on error type
 		let message = issue.message
-		if (issue.code === "invalid_enum_value" && "options" in issue) {
-			message = `Invalid value. Expected: ${(issue.options as string[]).join(" | ")}`
-		} else if (issue.code === "invalid_type" && issue.received === "null") {
+		if (issue.code === "invalid_value") {
+			const values = (issue as { values?: unknown[] }).values
+			const input = (issue as { input?: unknown }).input
+			message = `Invalid value "${input}". Expected: ${values?.join(" | ") ?? "valid value"}`
+		} else if (issue.code === "invalid_type" && (issue as { input?: unknown }).input === null) {
 			message = "Required field missing"
 		}
 
@@ -842,11 +844,12 @@ Coder task complete. Proceed to code review:
 
 			// Extract current task from plan
 			const currentMatch = planContent.match(/← CURRENT/)
-			const currentTask = currentMatch
-				? planContent
-						.slice(Math.max(0, currentMatch.index! - 100), currentMatch.index! + 50)
-						.match(/\d+\.\d+ [^\n←]+/)?.[0]
-				: null
+			let currentTask: string | null = null
+			if (currentMatch?.index !== undefined) {
+				const start = Math.max(0, currentMatch.index - 100)
+				const end = currentMatch.index + 50
+				currentTask = planContent.slice(start, end).match(/\d+\.\d+ [^\n←]+/)?.[0] ?? null
+			}
 
 			output.context.push(`<workspace-context>
 ## Current Plan

@@ -360,15 +360,15 @@ export const NotifyPlugin: Plugin = async (ctx) => {
 					}
 					break
 				}
-
 				case "session.error": {
 					const sessionID = event.properties.sessionID
 					const error = event.properties.error
+					const errorMessage = typeof error === "string" ? error : error ? String(error) : undefined
 					if (sessionID) {
 						await handleSessionError(
 							client as OpencodeClient,
 							sessionID,
-							error,
+							errorMessage,
 							config,
 							terminalInfo,
 						)
