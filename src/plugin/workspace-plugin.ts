@@ -1,9 +1,9 @@
-import * as crypto from "node:crypto"
 import * as fs from "node:fs/promises"
 import * as os from "node:os"
 import * as path from "node:path"
 import { type Plugin, tool } from "@opencode-ai/plugin"
 import { z } from "zod"
+import { getProjectId } from "./worktree/state"
 
 // ==========================================
 // PLAN SCHEMA & VALIDATION
@@ -513,11 +513,9 @@ Review triggers:
 export const WorkspacePlugin: Plugin = async (ctx) => {
 	const { directory } = ctx
 
-	// Project-level storage directory (shared across sessions)
-	const realDir = await fs.realpath(directory)
-	const normalizedDir = realDir.endsWith(path.sep) ? realDir.slice(0, -1) : realDir
-	const projectHash = crypto.createHash("sha256").update(normalizedDir).digest("hex").slice(0, 40)
-	const baseDir = path.join(os.homedir(), ".local", "share", "opencode", "workspace", projectHash)
+	// Use git root commit hash for cross-worktree consistency
+	const projectId = await getProjectId(directory)
+	const baseDir = path.join(os.homedir(), ".local", "share", "opencode", "workspace", projectId)
 
 	/**
 	 * Resolves the root session ID by walking up the parent chain.

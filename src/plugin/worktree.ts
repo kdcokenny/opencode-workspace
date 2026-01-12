@@ -12,10 +12,21 @@
  */
 
 import type { Database } from "bun:sqlite"
-import * as fs from "node:fs/promises"
+import { access, copyFile, cp, mkdir, rm, stat, symlink } from "node:fs/promises"
+import * as os from "node:os"
 import * as path from "node:path"
 import { type Plugin, tool } from "@opencode-ai/plugin"
-import type { Event } from "@opencode-ai/sdk"
+import type { createOpencodeClient, Event } from "@opencode-ai/sdk"
+
+type OpencodeClient = ReturnType<typeof createOpencodeClient>
+
+/** Logger interface for structured logging */
+interface Logger {
+	debug: (msg: string) => void
+	info: (msg: string) => void
+	warn: (msg: string) => void
+	error: (msg: string) => void
+}
 
 import { parse as parseJsonc } from "jsonc-parser"
 import { z } from "zod"
@@ -24,6 +35,7 @@ import {
 	addSession,
 	clearPendingDelete,
 	getPendingDelete,
+	getProjectId,
 	getSession,
 	getWorktreePath,
 	initStateDb,
@@ -37,6 +49,9 @@ const DB_MAX_RETRIES = 3
 
 /** Delay between retry attempts in milliseconds */
 const DB_RETRY_DELAY_MS = 100
+
+/** Maximum depth to traverse session parent chain */
+const MAX_SESSION_CHAIN_DEPTH = 10
 
 // =============================================================================
 // TYPES & SCHEMAS
@@ -128,6 +143,182 @@ const worktreeConfigSchema = z.object({
 type WorktreeConfig = z.infer<typeof worktreeConfigSchema>
 
 // =============================================================================
+// ERROR TYPES
+// =============================================================================
+
+class WorktreeError extends Error {
+	constructor(
+		message: string,
+		public readonly operation: string,
+		public readonly cause?: unknown,
+	) {
+		super(`${operation}: ${message}`)
+		this.name = "WorktreeError"
+	}
+}
+
+// =============================================================================
+// SESSION FORKING HELPERS
+// =============================================================================
+
+/**
+ * Check if a path exists, distinguishing ENOENT from other errors (Law 4)
+ */
+async function pathExists(filePath: string): Promise<boolean> {
+	try {
+		await access(filePath)
+		return true
+	} catch (e: unknown) {
+		if (e && typeof e === "object" && "code" in e && e.code === "ENOENT") {
+			return false
+		}
+		throw e // Re-throw permission errors, etc.
+	}
+}
+
+/**
+ * Copy file if source exists. Returns true if copied, false if source doesn't exist.
+ * Throws on copy failure (Law 4: Fail Loud)
+ */
+async function copyIfExists(src: string, dest: string): Promise<boolean> {
+	if (!(await pathExists(src))) return false
+	await copyFile(src, dest)
+	return true
+}
+
+/**
+ * Copy directory contents if source exists.
+ * @param src - Source directory path
+ * @param dest - Destination directory path
+ * @returns true if copy was performed, false if source doesn't exist
+ */
+async function copyDirIfExists(src: string, dest: string): Promise<boolean> {
+	if (!(await pathExists(src))) return false
+	await cp(src, dest, { recursive: true })
+	return true
+}
+
+interface ForkResult {
+	forkedSession: { id: string }
+	rootSessionId: string
+	planCopied: boolean
+	delegationsCopied: boolean
+}
+
+/**
+ * Fork a session and copy associated plans/delegations.
+ * Cleans up forked session on failure (atomic operation).
+ */
+async function forkWithContext(
+	client: OpencodeClient,
+	sessionId: string,
+	projectId: string,
+	getRootSessionIdFn: (sessionId: string) => Promise<string>,
+): Promise<ForkResult> {
+	// Guard clauses (Law 1)
+	if (!client) throw new WorktreeError("client is required", "forkWithContext")
+	if (!sessionId) throw new WorktreeError("sessionId is required", "forkWithContext")
+	if (!projectId) throw new WorktreeError("projectId is required", "forkWithContext")
+
+	// Get root session ID with error wrapping
+	let rootSessionId: string
+	try {
+		rootSessionId = await getRootSessionIdFn(sessionId)
+	} catch (e) {
+		throw new WorktreeError("Failed to get root session ID", "forkWithContext", e)
+	}
+
+	// Fork session
+	const forkedSessionResponse = await client.session.fork({
+		path: { id: sessionId },
+		body: {},
+	})
+	const forkedSession = forkedSessionResponse.data
+	if (!forkedSession?.id) {
+		throw new WorktreeError("Failed to fork session: no session data returned", "forkWithContext")
+	}
+
+	// Copy data with cleanup on failure
+	let planCopied = false
+	let delegationsCopied = false
+
+	try {
+		const workspaceBase = path.join(os.homedir(), ".local", "share", "opencode", "workspace")
+		const delegationsBase = path.join(os.homedir(), ".local", "share", "opencode", "delegations")
+
+		const destWorkspaceDir = path.join(workspaceBase, projectId, forkedSession.id)
+		const destDelegationsDir = path.join(delegationsBase, projectId, forkedSession.id)
+
+		await mkdir(destWorkspaceDir, { recursive: true })
+		await mkdir(destDelegationsDir, { recursive: true })
+
+		// Copy plan
+		const srcPlan = path.join(workspaceBase, projectId, rootSessionId, "plan.md")
+		const destPlan = path.join(destWorkspaceDir, "plan.md")
+		planCopied = await copyIfExists(srcPlan, destPlan)
+
+		// Copy delegations
+		const srcDelegations = path.join(delegationsBase, projectId, rootSessionId)
+		delegationsCopied = await copyDirIfExists(srcDelegations, destDelegationsDir)
+	} catch (error) {
+		client.app
+			.log({
+				body: {
+					service: "worktree",
+					level: "error",
+					message: `forkWithContext: Copy failed, cleaning up forked session: ${error}`,
+				},
+			})
+			.catch(() => {})
+		// Clean up orphaned directories
+		const workspaceBase = path.join(os.homedir(), ".local", "share", "opencode", "workspace")
+		const delegationsBase = path.join(os.homedir(), ".local", "share", "opencode", "delegations")
+		const destWorkspaceDir = path.join(workspaceBase, projectId, forkedSession.id)
+		const destDelegationsDir = path.join(delegationsBase, projectId, forkedSession.id)
+		await rm(destWorkspaceDir, { recursive: true, force: true }).catch((e) => {
+			client.app
+				.log({
+					body: {
+						service: "worktree",
+						level: "error",
+						message: `forkWithContext: Failed to clean up workspace dir ${destWorkspaceDir}: ${e}`,
+					},
+				})
+				.catch(() => {})
+		})
+		await rm(destDelegationsDir, { recursive: true, force: true }).catch((e) => {
+			client.app
+				.log({
+					body: {
+						service: "worktree",
+						level: "error",
+						message: `forkWithContext: Failed to clean up delegations dir ${destDelegationsDir}: ${e}`,
+					},
+				})
+				.catch(() => {})
+		})
+		await client.session.delete({ path: { id: forkedSession.id } }).catch((e) => {
+			client.app
+				.log({
+					body: {
+						service: "worktree",
+						level: "error",
+						message: `forkWithContext: Failed to clean up forked session ${forkedSession.id}: ${e}`,
+					},
+				})
+				.catch(() => {})
+		})
+		throw new WorktreeError(
+			`Failed to copy session data: ${error instanceof Error ? error.message : String(error)}`,
+			"forkWithContext",
+			error,
+		)
+	}
+
+	return { forkedSession, rootSessionId, planCopied, delegationsCopied }
+}
+
+// =============================================================================
 // MODULE-LEVEL STATE
 // =============================================================================
 
@@ -174,7 +365,7 @@ function registerCleanupHandlers(database: Database): void {
  * @returns Database instance
  * @throws {Error} if initialization fails after all retries
  */
-async function getDb(): Promise<Database> {
+async function getDb(log: Logger): Promise<Database> {
 	if (db) return db
 
 	if (!projectRoot) {
@@ -190,9 +381,7 @@ async function getDb(): Promise<Database> {
 			return db
 		} catch (error) {
 			lastError = error instanceof Error ? error : new Error(String(error))
-			console.warn(
-				`Database init attempt ${attempt}/${DB_MAX_RETRIES} failed: ${lastError.message}`,
-			)
+			log.warn(`Database init attempt ${attempt}/${DB_MAX_RETRIES} failed: ${lastError.message}`)
 
 			if (attempt < DB_MAX_RETRIES) {
 				Bun.sleepSync(DB_RETRY_DELAY_MS)
@@ -209,9 +398,9 @@ async function getDb(): Promise<Database> {
  * Initialize the database with the project root path.
  * Must be called once before any getDb() calls.
  */
-async function initDb(root: string): Promise<Database> {
+async function initDb(root: string, log: Logger): Promise<Database> {
 	projectRoot = root
-	return getDb()
+	return getDb(log)
 }
 
 // =============================================================================
@@ -256,7 +445,7 @@ async function createWorktree(
 	const worktreePath = await getWorktreePath(repoRoot, branch)
 
 	// Ensure parent directory exists
-	await fs.mkdir(path.dirname(worktreePath), { recursive: true })
+	await mkdir(path.dirname(worktreePath), { recursive: true })
 
 	const exists = await branchExists(repoRoot, branch)
 
@@ -287,21 +476,21 @@ async function removeWorktree(
 /**
  * Validate that a path is safe (no escape from base directory)
  */
-function isPathSafe(filePath: string, baseDir: string): boolean {
+function isPathSafe(filePath: string, baseDir: string, log: Logger): boolean {
 	// Reject absolute paths
 	if (path.isAbsolute(filePath)) {
-		console.warn(`[worktree] Rejected absolute path: ${filePath}`)
+		log.warn(`[worktree] Rejected absolute path: ${filePath}`)
 		return false
 	}
 	// Reject obvious path traversal
 	if (filePath.includes("..")) {
-		console.warn(`[worktree] Rejected path traversal: ${filePath}`)
+		log.warn(`[worktree] Rejected path traversal: ${filePath}`)
 		return false
 	}
 	// Verify resolved path stays within base directory
 	const resolved = path.resolve(baseDir, filePath)
 	if (!resolved.startsWith(baseDir + path.sep) && resolved !== baseDir) {
-		console.warn(`[worktree] Path escapes base directory: ${filePath}`)
+		log.warn(`[worktree] Path escapes base directory: ${filePath}`)
 		return false
 	}
 	return true
@@ -311,9 +500,14 @@ function isPathSafe(filePath: string, baseDir: string): boolean {
  * Copy files from source directory to target directory.
  * Skips missing files silently (production pattern).
  */
-async function copyFiles(sourceDir: string, targetDir: string, files: string[]): Promise<void> {
+async function copyFiles(
+	sourceDir: string,
+	targetDir: string,
+	files: string[],
+	log: Logger,
+): Promise<void> {
 	for (const file of files) {
-		if (!isPathSafe(file, sourceDir)) continue
+		if (!isPathSafe(file, sourceDir, log)) continue
 
 		const sourcePath = path.join(sourceDir, file)
 		const targetPath = path.join(targetDir, file)
@@ -321,25 +515,25 @@ async function copyFiles(sourceDir: string, targetDir: string, files: string[]):
 		try {
 			const sourceFile = Bun.file(sourcePath)
 			if (!(await sourceFile.exists())) {
-				console.debug(`[worktree] Skipping missing file: ${file}`)
+				log.debug(`[worktree] Skipping missing file: ${file}`)
 				continue
 			}
 
 			// Ensure target directory exists
 			const targetFileDir = path.dirname(targetPath)
-			await fs.mkdir(targetFileDir, { recursive: true })
+			await mkdir(targetFileDir, { recursive: true })
 
 			// Copy file
 			await Bun.write(targetPath, sourceFile)
-			console.log(`[worktree] Copied: ${file}`)
+			log.info(`[worktree] Copied: ${file}`)
 		} catch (error) {
 			const isNotFound =
 				error instanceof Error &&
 				(error.message.includes("ENOENT") || error.message.includes("no such file"))
 			if (isNotFound) {
-				console.debug(`[worktree] Skipping missing: ${file}`)
+				log.debug(`[worktree] Skipping missing: ${file}`)
 			} else {
-				console.warn(`[worktree] Failed to copy ${file}: ${error}`)
+				log.warn(`[worktree] Failed to copy ${file}: ${error}`)
 			}
 		}
 	}
@@ -349,33 +543,38 @@ async function copyFiles(sourceDir: string, targetDir: string, files: string[]):
  * Create symlinks for directories from source to target.
  * Uses absolute paths for symlink targets.
  */
-async function symlinkDirs(sourceDir: string, targetDir: string, dirs: string[]): Promise<void> {
+async function symlinkDirs(
+	sourceDir: string,
+	targetDir: string,
+	dirs: string[],
+	log: Logger,
+): Promise<void> {
 	for (const dir of dirs) {
-		if (!isPathSafe(dir, sourceDir)) continue
+		if (!isPathSafe(dir, sourceDir, log)) continue
 
 		const sourcePath = path.join(sourceDir, dir)
 		const targetPath = path.join(targetDir, dir)
 
 		try {
 			// Check if source directory exists
-			const stat = await fs.stat(sourcePath).catch(() => null)
-			if (!stat || !stat.isDirectory()) {
-				console.debug(`[worktree] Skipping missing directory: ${dir}`)
+			const fileStat = await stat(sourcePath).catch(() => null)
+			if (!fileStat || !fileStat.isDirectory()) {
+				log.debug(`[worktree] Skipping missing directory: ${dir}`)
 				continue
 			}
 
 			// Ensure parent directory exists
 			const targetParentDir = path.dirname(targetPath)
-			await fs.mkdir(targetParentDir, { recursive: true })
+			await mkdir(targetParentDir, { recursive: true })
 
 			// Remove existing target if it exists (might be empty dir from git)
-			await fs.rm(targetPath, { recursive: true, force: true })
+			await rm(targetPath, { recursive: true, force: true })
 
 			// Create symlink (use absolute path for source)
-			await fs.symlink(sourcePath, targetPath, "dir")
-			console.log(`[worktree] Symlinked: ${dir}`)
+			await symlink(sourcePath, targetPath, "dir")
+			log.info(`[worktree] Symlinked: ${dir}`)
 		} catch (error) {
-			console.warn(`[worktree] Failed to symlink ${dir}: ${error}`)
+			log.warn(`[worktree] Failed to symlink ${dir}: ${error}`)
 		}
 	}
 }
@@ -383,9 +582,9 @@ async function symlinkDirs(sourceDir: string, targetDir: string, dirs: string[])
 /**
  * Run hook commands in the worktree directory.
  */
-async function runHooks(cwd: string, commands: string[]): Promise<void> {
+async function runHooks(cwd: string, commands: string[], log: Logger): Promise<void> {
 	for (const command of commands) {
-		console.log(`[worktree] Running hook: ${command}`)
+		log.info(`[worktree] Running hook: ${command}`)
 		try {
 			// Use shell to properly handle quoted arguments and complex commands
 			const result = Bun.spawnSync(["bash", "-c", command], {
@@ -395,12 +594,12 @@ async function runHooks(cwd: string, commands: string[]): Promise<void> {
 			})
 			if (result.exitCode !== 0) {
 				const stderr = result.stderr?.toString() || ""
-				console.warn(
+				log.warn(
 					`[worktree] Hook failed (exit ${result.exitCode}): ${command}${stderr ? `\n${stderr}` : ""}`,
 				)
 			}
 		} catch (error) {
-			console.warn(`[worktree] Hook error: ${error}`)
+			log.warn(`[worktree] Hook error: ${error}`)
 		}
 	}
 }
@@ -409,7 +608,7 @@ async function runHooks(cwd: string, commands: string[]): Promise<void> {
  * Load worktree-specific configuration from .opencode/worktree.jsonc
  * Auto-creates config file with helpful defaults if it doesn't exist.
  */
-async function loadWorktreeConfig(directory: string): Promise<WorktreeConfig> {
+async function loadWorktreeConfig(directory: string, log: Logger): Promise<WorktreeConfig> {
 	const configPath = path.join(directory, ".opencode", "worktree.jsonc")
 
 	try {
@@ -447,9 +646,9 @@ async function loadWorktreeConfig(directory: string): Promise<WorktreeConfig> {
 }
 `
 			// Ensure .opencode directory exists
-			await fs.mkdir(path.join(directory, ".opencode"), { recursive: true })
+			await mkdir(path.join(directory, ".opencode"), { recursive: true })
 			await Bun.write(configPath, defaultConfig)
-			console.log(`[worktree] Created default config: ${configPath}`)
+			log.info(`[worktree] Created default config: ${configPath}`)
 			return worktreeConfigSchema.parse({})
 		}
 
@@ -457,12 +656,12 @@ async function loadWorktreeConfig(directory: string): Promise<WorktreeConfig> {
 		// Use proper JSONC parser (handles comments in strings correctly)
 		const parsed = parseJsonc(content)
 		if (parsed === undefined) {
-			console.error(`[worktree] Invalid worktree.jsonc syntax`)
+			log.error(`[worktree] Invalid worktree.jsonc syntax`)
 			return worktreeConfigSchema.parse({})
 		}
 		return worktreeConfigSchema.parse(parsed)
 	} catch (error) {
-		console.warn(`[worktree] Failed to load config: ${error}`)
+		log.warn(`[worktree] Failed to load config: ${error}`)
 		return worktreeConfigSchema.parse({})
 	}
 }
@@ -472,10 +671,29 @@ async function loadWorktreeConfig(directory: string): Promise<WorktreeConfig> {
 // =============================================================================
 
 export const WorktreePlugin: Plugin = async (ctx) => {
-	const { directory } = ctx
+	const { directory, client } = ctx
+
+	const log = {
+		debug: (msg: string) =>
+			client.app
+				.log({ body: { service: "worktree", level: "debug", message: msg } })
+				.catch(() => {}),
+		info: (msg: string) =>
+			client.app
+				.log({ body: { service: "worktree", level: "info", message: msg } })
+				.catch(() => {}),
+		warn: (msg: string) =>
+			client.app
+				.log({ body: { service: "worktree", level: "warn", message: msg } })
+				.catch(() => {}),
+		error: (msg: string) =>
+			client.app
+				.log({ body: { service: "worktree", level: "error", message: msg } })
+				.catch(() => {}),
+	}
 
 	// Initialize SQLite database
-	const database = await initDb(directory)
+	const database = await initDb(directory, log)
 
 	return {
 		tool: {
@@ -515,40 +733,60 @@ export const WorktreePlugin: Plugin = async (ctx) => {
 					const worktreePath = result.value
 
 					// Sync files from main worktree
-					const worktreeConfig = await loadWorktreeConfig(directory)
+					const worktreeConfig = await loadWorktreeConfig(directory, log)
 					const mainWorktreePath = directory // The repo root is the main worktree
 
 					// Copy files
 					if (worktreeConfig.sync.copyFiles.length > 0) {
-						await copyFiles(mainWorktreePath, worktreePath, worktreeConfig.sync.copyFiles)
+						await copyFiles(mainWorktreePath, worktreePath, worktreeConfig.sync.copyFiles, log)
 					}
 
 					// Symlink directories
 					if (worktreeConfig.sync.symlinkDirs.length > 0) {
-						await symlinkDirs(mainWorktreePath, worktreePath, worktreeConfig.sync.symlinkDirs)
+						await symlinkDirs(mainWorktreePath, worktreePath, worktreeConfig.sync.symlinkDirs, log)
 					}
 
 					// Run postCreate hooks
 					if (worktreeConfig.hooks.postCreate.length > 0) {
-						await runHooks(worktreePath, worktreeConfig.hooks.postCreate)
+						await runHooks(worktreePath, worktreeConfig.hooks.postCreate, log)
 					}
 
-					const sessionId = toolCtx?.sessionID ?? "unknown"
+					// Fork session with context (replaces --session resume)
+					const projectId = await getProjectId(worktreePath, client)
+					const { forkedSession, planCopied, delegationsCopied } = await forkWithContext(
+						client,
+						toolCtx.sessionID,
+						projectId,
+						async (sid) => {
+							// Walk up parentID chain to find root session
+							let currentId = sid
+							for (let depth = 0; depth < MAX_SESSION_CHAIN_DEPTH; depth++) {
+								const session = await client.session.get({ path: { id: currentId } })
+								if (!session.data?.parentID) return currentId
+								currentId = session.data.parentID
+							}
+							return currentId
+						},
+					)
 
-					// Spawn terminal IMMEDIATELY (not deferred - avoids race conditions)
+					log.debug(
+						`Forked session ${forkedSession.id}, plan: ${planCopied}, delegations: ${delegationsCopied}`,
+					)
+
+					// Spawn worktree with forked session
 					const terminalResult = await openTerminal(
 						worktreePath,
-						`opencode --session ${sessionId}`,
+						`opencode --session ${forkedSession.id}`,
 						args.branch,
 					)
 
 					if (!terminalResult.success) {
-						console.warn(`[worktree] Failed to open terminal: ${terminalResult.error}`)
+						log.warn(`[worktree] Failed to open terminal: ${terminalResult.error}`)
 					}
 
 					// Record session for tracking (used by delete flow)
 					addSession(database, {
-						id: sessionId,
+						id: forkedSession.id,
 						branch: args.branch,
 						path: worktreePath,
 						createdAt: new Date().toISOString(),
@@ -574,7 +812,7 @@ export const WorktreePlugin: Plugin = async (ctx) => {
 					}
 
 					// Set pending delete for session.idle (atomic operation)
-					setPendingDelete(database, { branch: session.branch, path: session.path })
+					setPendingDelete(database, { branch: session.branch, path: session.path }, client)
 
 					return `Worktree marked for cleanup. It will be removed when this session ends.`
 				},
@@ -590,25 +828,25 @@ export const WorktreePlugin: Plugin = async (ctx) => {
 				const { path: worktreePath, branch } = pendingDelete
 
 				// Run preDelete hooks before cleanup
-				const config = await loadWorktreeConfig(directory)
+				const config = await loadWorktreeConfig(directory, log)
 				if (config.hooks.preDelete.length > 0) {
-					await runHooks(worktreePath, config.hooks.preDelete)
+					await runHooks(worktreePath, config.hooks.preDelete, log)
 				}
 
 				// Commit any uncommitted changes
 				const addResult = await git(["add", "-A"], worktreePath)
-				if (!addResult.ok) console.warn(`[worktree] git add failed: ${addResult.error}`)
+				if (!addResult.ok) log.warn(`[worktree] git add failed: ${addResult.error}`)
 
 				const commitResult = await git(
 					["commit", "-m", "chore(worktree): session snapshot", "--allow-empty"],
 					worktreePath,
 				)
-				if (!commitResult.ok) console.warn(`[worktree] git commit failed: ${commitResult.error}`)
+				if (!commitResult.ok) log.warn(`[worktree] git commit failed: ${commitResult.error}`)
 
 				// Remove worktree
 				const removeResult = await removeWorktree(directory, worktreePath)
 				if (!removeResult.ok) {
-					console.warn(`[worktree] Failed to remove worktree: ${removeResult.error}`)
+					log.warn(`[worktree] Failed to remove worktree: ${removeResult.error}`)
 				}
 
 				// Clear pending delete atomically

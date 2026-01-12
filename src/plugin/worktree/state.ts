@@ -10,9 +10,14 @@
 
 import { Database } from "bun:sqlite"
 import * as crypto from "node:crypto"
+import { mkdirSync } from "node:fs"
+import { stat } from "node:fs/promises"
 import * as os from "node:os"
 import * as path from "node:path"
+import type { createOpencodeClient } from "@opencode-ai/sdk"
 import { z } from "zod"
+
+type OpencodeClient = ReturnType<typeof createOpencodeClient>
 
 // =============================================================================
 // TYPES
@@ -61,6 +66,23 @@ const pendingDeleteSchema = z.object({
 	path: z.string().min(1),
 })
 
+/**
+ * Log a warning message using client.app.log if available, otherwise console.warn.
+ * @param client - Optional OpenCode client for proper logging
+ * @param message - Warning message to log
+ */
+function logWarn(client: OpencodeClient | undefined, message: string): void {
+	if (client) {
+		client.app
+			.log({
+				body: { service: "worktree", level: "warn", message },
+			})
+			.catch(() => {})
+	} else {
+		console.warn(message)
+	}
+}
+
 // =============================================================================
 // DATABASE UTILITIES
 // =============================================================================
@@ -72,66 +94,131 @@ const pendingDeleteSchema = z.object({
  * Falls back to path hash for non-git repos or empty repos.
  * Caches result in .git/opencode for performance.
  *
+ * Handles git worktrees: when .git is a file (worktree), resolves the
+ * actual .git directory and uses shared cache.
+ *
  * @param projectRoot - Absolute path to the project root
  * @returns 40-char hex SHA (git root) or 16-char hash (fallback)
  */
-export async function getProjectId(projectRoot: string): Promise<string> {
-	// Guard: throw if projectRoot empty/invalid
+export async function getProjectId(projectRoot: string, client?: OpencodeClient): Promise<string> {
+	// Guard clause (Law 1)
 	if (!projectRoot || typeof projectRoot !== "string") {
-		throw new Error("projectRoot is required")
+		throw new Error("getProjectId: projectRoot is required and must be a string")
 	}
 
-	// Try to read cached ID from .git/opencode
-	const gitDir = path.join(projectRoot, ".git")
-	const cacheFile = path.join(gitDir, "opencode")
-	try {
-		const cached = await Bun.file(cacheFile).text()
-		const trimmed = cached.trim()
-		// Validate: must be 40-char hex SHA
-		if (/^[a-f0-9]{40}$/i.test(trimmed)) {
-			return trimmed
+	const gitPath = path.join(projectRoot, ".git")
+
+	// Check if .git exists and what type it is
+	const gitStat = await stat(gitPath).catch(() => null)
+
+	if (!gitStat) {
+		// .git doesn't exist - not a git repo, use path hash fallback
+		logWarn(client, `getProjectId: No .git found at ${projectRoot}, using path hash`)
+		return hashPath(projectRoot)
+	}
+
+	let gitDir = gitPath
+
+	// Handle worktree case: .git is a file containing gitdir reference
+	if (gitStat.isFile()) {
+		const content = await Bun.file(gitPath).text()
+		const match = content.match(/^gitdir:\s*(.+)$/m)
+
+		if (!match) {
+			throw new Error(`getProjectId: .git file exists but has invalid format at ${gitPath}`)
 		}
-	} catch {
-		// Cache miss or read error - continue to compute
+
+		// Resolve path (handles both relative and absolute)
+		const gitdirPath = match[1].trim()
+		const resolvedGitdir = path.resolve(projectRoot, gitdirPath)
+
+		// The gitdir contains a 'commondir' file pointing to shared .git
+		const commondirPath = path.join(resolvedGitdir, "commondir")
+		const commondirFile = Bun.file(commondirPath)
+		if (await commondirFile.exists()) {
+			const commondirContent = (await commondirFile.text()).trim()
+			gitDir = path.resolve(resolvedGitdir, commondirContent)
+		} else {
+			// Fallback to ../.. assumption for older git or unusual setups
+			gitDir = path.resolve(resolvedGitdir, "../..")
+		}
+
+		// Validate resolved path exists
+		const gitDirStat = await stat(gitDir).catch(() => null)
+		if (!gitDirStat?.isDirectory()) {
+			throw new Error(`getProjectId: Resolved gitdir ${gitDir} is not a directory`)
+		}
 	}
 
-	// Try to get first root commit SHA
+	// Check cache
+	const cacheFile = path.join(gitDir, "opencode")
+	const cache = Bun.file(cacheFile)
+
+	if (await cache.exists()) {
+		const cached = (await cache.text()).trim()
+		// Validate cache content (40-char hex for git hash, or 16-char for path hash)
+		if (/^[a-f0-9]{40}$/i.test(cached) || /^[a-f0-9]{16}$/i.test(cached)) {
+			return cached
+		}
+		logWarn(client, `getProjectId: Invalid cache content at ${cacheFile}, regenerating`)
+	}
+
+	// Generate project ID from git root commit
 	try {
 		const proc = Bun.spawn(["git", "rev-list", "--max-parents=0", "--all"], {
 			cwd: projectRoot,
 			stdout: "pipe",
 			stderr: "pipe",
+			env: { ...process.env, GIT_DIR: undefined, GIT_WORK_TREE: undefined },
 		})
 
-		// 5-second timeout to prevent hanging on slow/unresponsive git
-		const timeout = new Promise<string>((_, reject) =>
-			setTimeout(() => reject(new Error("git command timeout")), 5000),
-		)
+		// 5 second timeout to prevent hangs on network filesystems
+		const timeoutMs = 5000
+		const exitCode = await Promise.race([
+			proc.exited,
+			new Promise<number>((_, reject) =>
+				setTimeout(() => {
+					proc.kill()
+					reject(new Error(`git rev-list timed out after ${timeoutMs}ms`))
+				}, timeoutMs),
+			),
+		]).catch(() => 1) // Treat timeout as failure, fall back to path hash
+		if (exitCode === 0) {
+			const output = await new Response(proc.stdout).text()
+			const roots = output
+				.split("\n")
+				.filter(Boolean)
+				.map((x) => x.trim())
+				.sort()
 
-		const output = await Promise.race([new Response(proc.stdout).text(), timeout])
-		const roots = output
-			.split("\n")
-			.filter(Boolean)
-			.map((s) => s.trim())
-			.toSorted()
-
-		if (roots.length > 0 && /^[a-f0-9]{40}$/i.test(roots[0])) {
-			const projectId = roots[0]
-
-			// Cache the result (warn on failure, don't throw)
-			try {
-				await Bun.write(cacheFile, projectId)
-			} catch (e) {
-				console.warn("Failed to cache project ID:", e)
+			if (roots.length > 0 && /^[a-f0-9]{40}$/i.test(roots[0])) {
+				const projectId = roots[0]
+				// Cache the result
+				try {
+					await Bun.write(cacheFile, projectId)
+				} catch (e) {
+					logWarn(client, `getProjectId: Failed to cache project ID: ${e}`)
+				}
+				return projectId
 			}
-
-			return projectId
+		} else {
+			const stderr = await new Response(proc.stderr).text()
+			logWarn(client, `getProjectId: git rev-list failed (${exitCode}): ${stderr.trim()}`)
 		}
-	} catch {
-		// Git command failed - fallback to path hash
+	} catch (error) {
+		logWarn(client, `getProjectId: git command failed: ${error}`)
 	}
 
-	// Fallback: use current path-hash behavior
+	// Fallback to path hash
+	return hashPath(projectRoot)
+}
+
+/**
+ * Generate a short hash from a path for project ID fallback.
+ * @param projectRoot - Absolute path to hash
+ * @returns 16-char hex hash
+ */
+function hashPath(projectRoot: string): string {
 	const hash = crypto.createHash("sha256").update(projectRoot).digest("hex")
 	return hash.slice(0, 16)
 }
@@ -193,14 +280,7 @@ export async function initStateDb(projectRoot: string): Promise<Database> {
 	const dbDir = path.dirname(dbPath)
 
 	// Create directory synchronously (required before opening DB)
-	const mkdirSync = (dir: string) => {
-		try {
-			Bun.spawnSync(["mkdir", "-p", dir])
-		} catch {
-			// Directory may already exist
-		}
-	}
-	mkdirSync(dbDir)
+	mkdirSync(dbDir, { recursive: true })
 
 	// Open database (creates if doesn't exist)
 	const db = new Database(dbPath)
@@ -338,7 +418,7 @@ export function getAllSessions(db: Database): Session[] {
  * @param db - Database instance from initStateDb
  * @param spawn - Spawn operation data
  */
-export function setPendingSpawn(db: Database, spawn: PendingSpawn): void {
+export function setPendingSpawn(db: Database, spawn: PendingSpawn, client?: OpencodeClient): void {
 	// Parse at boundary for type safety
 	const parsed = pendingSpawnSchema.parse(spawn)
 
@@ -347,9 +427,9 @@ export function setPendingSpawn(db: Database, spawn: PendingSpawn): void {
 	const existingDelete = getPendingDelete(db)
 
 	if (existingSpawn) {
-		console.warn(`Replacing pending spawn: "${existingSpawn.branch}" → "${parsed.branch}"`)
+		logWarn(client, `Replacing pending spawn: "${existingSpawn.branch}" → "${parsed.branch}"`)
 	} else if (existingDelete) {
-		console.warn(`Pending spawn replacing pending delete for: "${existingDelete.branch}"`)
+		logWarn(client, `Pending spawn replacing pending delete for: "${existingDelete.branch}"`)
 	}
 
 	// Atomic: replace any existing pending operation
@@ -412,7 +492,7 @@ export function clearPendingSpawn(db: Database): void {
  * @param db - Database instance from initStateDb
  * @param del - Delete operation data
  */
-export function setPendingDelete(db: Database, del: PendingDelete): void {
+export function setPendingDelete(db: Database, del: PendingDelete, client?: OpencodeClient): void {
 	// Parse at boundary for type safety
 	const parsed = pendingDeleteSchema.parse(del)
 
@@ -421,9 +501,9 @@ export function setPendingDelete(db: Database, del: PendingDelete): void {
 	const existingSpawn = getPendingSpawn(db)
 
 	if (existingDelete) {
-		console.warn(`Replacing pending delete: "${existingDelete.branch}" → "${parsed.branch}"`)
+		logWarn(client, `Replacing pending delete: "${existingDelete.branch}" → "${parsed.branch}"`)
 	} else if (existingSpawn) {
-		console.warn(`Pending delete replacing pending spawn for: "${existingSpawn.branch}"`)
+		logWarn(client, `Pending delete replacing pending spawn for: "${existingSpawn.branch}"`)
 	}
 
 	// Atomic: replace any existing pending operation
