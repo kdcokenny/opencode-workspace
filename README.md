@@ -88,7 +88,7 @@ See the [OCX repository](https://github.com/kdcokenny/ocx) for installation inst
 ### 2. Add the KDCO Registry
 
 ```bash
-ocx registry add kdco https://registry.kdco.dev
+ocx registry add --name kdco https://registry.kdco.dev
 ```
 
 ### 3. Install the Bundle
