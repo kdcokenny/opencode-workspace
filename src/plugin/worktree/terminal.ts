@@ -12,16 +12,16 @@ import * as fs from "node:fs/promises"
 import * as os from "node:os"
 import * as path from "node:path"
 import { z } from "zod"
+import type { OpencodeClient } from "../kdco-primitives"
 import {
-	Mutex,
 	escapeAppleScript,
 	escapeBash,
 	escapeBatch,
 	getTempDir,
 	isInsideTmux,
 	logWarn,
+	Mutex,
 } from "../kdco-primitives"
-import type { OpencodeClient } from "../kdco-primitives"
 
 // =============================================================================
 // TEMP SCRIPT HELPER
