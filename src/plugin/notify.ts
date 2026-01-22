@@ -35,6 +35,7 @@ interface NotifyConfig {
 		idle: string
 		error: string
 		permission: string
+		question?: string
 	}
 	/** Quiet hours configuration */
 	quietHours: {
@@ -332,6 +333,23 @@ async function handlePermissionUpdated(
 	})
 }
 
+async function handleQuestionAsked(
+	config: NotifyConfig,
+	terminalInfo: TerminalInfo,
+): Promise<void> {
+	// Guard: quiet hours only (no focus check for questions - tmux workflow)
+	if (isQuietHours(config)) return
+
+	const sound = config.sounds.question ?? config.sounds.permission
+
+	sendNotification({
+		title: "Question for you",
+		message: "OpenCode needs your input",
+		sound,
+		terminalInfo,
+	})
+}
+
 // ==========================================
 // PLUGIN EXPORT
 // ==========================================
@@ -346,6 +364,11 @@ export const NotifyPlugin: Plugin = async (ctx) => {
 	const terminalInfo = await detectTerminalInfo(config)
 
 	return {
+		"tool.execute.before": async (input: { tool: string; sessionID: string; callID: string }) => {
+			if (input.tool === "question") {
+				await handleQuestionAsked(config, terminalInfo)
+			}
+		},
 		event: async ({ event }: { event: Event }): Promise<void> => {
 			switch (event.type) {
 				case "session.idle": {
