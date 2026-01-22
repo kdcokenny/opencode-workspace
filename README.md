@@ -91,6 +91,8 @@ See the [OCX repository](https://github.com/kdcokenny/ocx) for installation inst
 ocx registry add --name kdco https://registry.kdco.dev
 ```
 
+> **Tip:** Add `--global` to configure the registry globally instead of per-project.
+
 ### 3. Install the Bundle
 
 ```bash
