@@ -88,7 +88,7 @@ See the [OCX repository](https://github.com/kdcokenny/ocx) for installation inst
 ### 2. Add the KDCO Registry
 
 ```bash
-ocx registry add --name kdco https://registry.kdco.dev
+ocx registry add https://registry.kdco.dev --name kdco
 ```
 
 > **Tip:** Add `--global` to configure the registry globally instead of per-project.
