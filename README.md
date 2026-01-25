@@ -2,6 +2,22 @@
 
 Bundled multi-agent orchestration harness for OpenCode. One install, complete control.
 
+## Quick Start
+
+```bash
+# Add registries (one-time)
+ocx registry add https://ocx-kit.kdco.dev --name kit --global
+ocx registry add https://registry.kdco.dev --name kdco --global
+
+# Install profile
+ocx profile add ws --from kit/ws
+
+# Launch
+ocx oc -p ws
+```
+
+See the [full installation guide](../../docs/guides/kdco-workspace.md) for customization options.
+
 ## What This Is
 
 A **bundle** — a curated collection of 16 components that work together as a complete AI development harness. Installing `kdco/workspace` gives you:
