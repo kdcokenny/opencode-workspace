@@ -123,37 +123,49 @@
       "name": "code-philosophy",
       "type": "ocx:skill",
       "description": "The 5 Laws of Elegant Defense",
-      "files": ["skill/code-philosophy/SKILL.md"]
+      "files": [
+        { "path": "skill/code-philosophy/SKILL.md", "target": ".opencode/skills/code-philosophy/SKILL.md" }
+      ]
     },
     {
       "name": "code-review",
       "type": "ocx:skill",
       "description": "Review methodology with severity classification",
-      "files": ["skill/code-review/SKILL.md"]
+      "files": [
+        { "path": "skill/code-review/SKILL.md", "target": ".opencode/skills/code-review/SKILL.md" }
+      ]
     },
     {
       "name": "frontend-philosophy",
       "type": "ocx:skill",
       "description": "The 5 Pillars of Intentional UI",
-      "files": ["skill/frontend-philosophy/SKILL.md"]
+      "files": [
+        { "path": "skill/frontend-philosophy/SKILL.md", "target": ".opencode/skills/frontend-philosophy/SKILL.md" }
+      ]
     },
     {
       "name": "plan-review",
       "type": "ocx:skill",
       "description": "Implementation plan review criteria",
-      "files": ["skill/plan-review/SKILL.md"]
+      "files": [
+        { "path": "skill/plan-review/SKILL.md", "target": ".opencode/skills/plan-review/SKILL.md" }
+      ]
     },
     {
       "name": "plan-protocol",
       "type": "ocx:skill",
       "description": "Implementation planning guidelines with citations",
-      "files": ["skill/plan-protocol/SKILL.md"]
+      "files": [
+        { "path": "skill/plan-protocol/SKILL.md", "target": ".opencode/skills/plan-protocol/SKILL.md" }
+      ]
     },
     {
       "name": "atlassian",
       "type": "ocx:skill",
       "description": "Atlassian MCP tools for Jira and Confluence",
-      "files": ["skill/atlassian/SKILL.md"],
+      "files": [
+        { "path": "skill/atlassian/SKILL.md", "target": ".opencode/skills/atlassian/SKILL.md" }
+      ],
       "opencode": {
         "mcp": {
           "atlassian": {
@@ -168,13 +180,17 @@
       "name": "github-cli",
       "type": "ocx:skill",
       "description": "GitHub CLI (gh) operations",
-      "files": ["skill/github-cli/SKILL.md"]
+      "files": [
+        { "path": "skill/github-cli/SKILL.md", "target": ".opencode/skills/github-cli/SKILL.md" }
+      ]
     },
     {
       "name": "python-uv",
       "type": "ocx:skill",
       "description": "Python tooling with uv",
-      "files": ["skill/python-uv/SKILL.md"]
+      "files": [
+        { "path": "skill/python-uv/SKILL.md", "target": ".opencode/skills/python-uv/SKILL.md" }
+      ]
     },
     {
       "name": "review-command",
