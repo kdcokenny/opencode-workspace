@@ -1,0 +1,13 @@
+{
+  "$schema": "https://ocx.kdco.dev/schemas/profile.json",
+  "registries": {
+    "kdco": {
+      "url": "https://registry.kdco.dev"
+    },
+    "thompsonsed": {
+      "url": "https://thompsonsed.github.io/opencode-workspace/"
+    }
+  },
+  "lockRegistries": false,
+  "skipCompatCheck": false
+}
