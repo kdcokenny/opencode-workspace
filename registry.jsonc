@@ -165,16 +165,7 @@
       "description": "Atlassian MCP tools for Jira and Confluence",
       "files": [
         { "path": "skill/atlassian/SKILL.md", "target": ".opencode/skills/atlassian/SKILL.md" }
-      ],
-      "opencode": {
-        "mcp": {
-          "atlassian": {
-            "type": "local",
-            "command": ["npx", "-y", "mcp-remote@latest", "https://mcp.atlassian.com/v1/mcp"],
-            "enabled": true
-          }
-        }
-      }
+      ]
     },
     {
       "name": "github-cli",
