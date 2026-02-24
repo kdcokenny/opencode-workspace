@@ -12,7 +12,8 @@
       "type": "ocx:profile",
       "description": "Workspace profile with Atlassian integration, GitHub Copilot models, and extended skills",
       "files": [
-        { "path": "profiles/ws/opencode.jsonc", "target": "opencode.jsonc" }
+        { "path": "profiles/ws/opencode.jsonc", "target": "opencode.jsonc" },
+        { "path": "profiles/ws/ocx.jsonc", "target": "ocx.jsonc" }
       ],
       "dependencies": ["workspace"]
     },
