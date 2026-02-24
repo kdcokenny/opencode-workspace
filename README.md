@@ -6,7 +6,7 @@ A fork of [kdcokenny/opencode-workspace](https://github.com/kdcokenny/opencode-w
 
 ```bash
 # Add this registry
-ocx registry add https://thompsonsed-opencode.workers.dev --name thompsonsed --global
+ocx registry add https://thompsonsed.github.io/opencode-workspace --name thompsonsed --global
 
 # Install the profile
 ocx profile add ws --from thompsonsed/ws
@@ -61,15 +61,13 @@ git remote add upstream git@github.com:kdcokenny/opencode-workspace.git
 
 ## Self-Hosting
 
-Deploy your own fork as an OCX registry:
+This registry auto-deploys to GitHub Pages via Actions. To fork and host your own:
 
-```bash
-bun install
-bun run build
-bun run deploy  # requires wrangler login
-```
+1. Fork this repository
+2. Enable GitHub Pages (Settings → Pages → Source: GitHub Actions)
+3. Push to main - the workflow builds and deploys automatically
 
-This deploys to Cloudflare Workers. Update the registry URL in your installation instructions after deployment.
+Registry URL: `https://<username>.github.io/<repo-name>`
 
 ## Versioned Releases
 
