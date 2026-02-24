@@ -51,13 +51,7 @@
       "name": "researcher",
       "type": "ocx:agent", 
       "description": "Knowledge architect for external research",
-      "files": ["agent/researcher.md"],
-      "opencode": {
-        "mcp": {
-          "context7": "https://mcp.context7.com/mcp",
-          "exa": "https://mcp.exa.ai/mcp"
-        }
-      }
+      "files": ["agent/researcher.md"]
     },
     {
       "name": "reviewer",
