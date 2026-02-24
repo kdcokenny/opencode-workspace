@@ -2,7 +2,9 @@
 
 Bundled multi-agent orchestration harness for OpenCode. One install, complete control.
 
-## Quick Start
+> **This is a fork** of [kdcokenny/opencode-workspace](https://github.com/kdcokenny/opencode-workspace) with additional customizations. See [Fork Customizations](#fork-customizations) for details.
+
+## Quick Start (Original Registry)
 
 ```bash
 # One-time setup
@@ -18,6 +20,52 @@ ocx oc -p ws
 Need a custom profile? Open the KDCO Workspace harness in TweakOC: https://tweakoc.com/h/kdco-workspace
 
 See the [full installation guide](../../docs/guides/kdco-workspace.mdx) for more customization options.
+
+## Installation from This Fork
+
+If you want the fork-specific customizations (Atlassian MCP, GitHub Copilot models, additional skills):
+
+```bash
+# Clone directly
+git clone git@github.com:thompsonsed/opencode-workspace.git ~/.config/opencode/profiles/ws
+
+# Or if using OCX, add as local profile
+ocx profile add ws --path ~/.config/opencode/profiles/ws
+```
+
+### Per-Machine Setup
+
+After installation, some integrations require one-time setup:
+
+| Integration | Setup Required |
+|-------------|----------------|
+| **Atlassian MCP** | First use of `atlassian_*` tools will trigger OAuth login |
+| **GitHub CLI** | Ensure `gh auth login` is completed |
+| **Copilot Models** | Requires active GitHub Copilot subscription |
+
+### Syncing with Upstream
+
+To pull in updates from the original repository:
+
+```bash
+cd ~/.config/opencode/profiles/ws
+git remote add upstream git@github.com:kdcokenny/opencode-workspace.git  # one-time
+git fetch upstream
+git merge upstream/main
+```
+
+## Fork Customizations
+
+This fork extends the upstream with:
+
+| Category | Addition | Description |
+|----------|----------|-------------|
+| Skill | `atlassian` | Atlassian MCP tools for Jira, Confluence, and Compass |
+| Skill | `github-cli` | GitHub CLI (gh) operations for PRs, issues, releases |
+| Skill | `plan-protocol` | Implementation planning with citations |
+| Skill | `python-uv` | Python tooling via uv package manager |
+| MCP | Atlassian | OAuth-based Jira/Confluence integration |
+| Models | GitHub Copilot | claude-sonnet-4, claude-opus-4.5, o4-mini, gpt-4.1 |
 
 ## What This Is
 
