@@ -1,0 +1,186 @@
+{
+  "$schema": "https://ocx.kdco.dev/schemas/registry.json",
+  "name": "Thompson OpenCode Workspace",
+  "namespace": "thompsonsed",
+  "version": "1.0.0",
+  "author": "Sam Thompson",
+  "opencode": "1.0.0",
+  "ocx": "1.0.16",
+  "components": [
+    {
+      "name": "ws",
+      "type": "ocx:profile",
+      "description": "Workspace profile with Atlassian integration, GitHub Copilot models, and extended skills",
+      "files": [
+        { "path": "profiles/ws/opencode.jsonc", "target": "opencode.jsonc" }
+      ],
+      "dependencies": ["workspace"]
+    },
+    {
+      "name": "workspace",
+      "type": "ocx:bundle",
+      "description": "Complete workspace bundle with agents, plugins, skills, and commands",
+      "files": [],
+      "dependencies": [
+        "coder",
+        "researcher", 
+        "reviewer",
+        "scribe",
+        "background-agents",
+        "workspace-plugin",
+        "worktree",
+        "notify",
+        "code-philosophy",
+        "code-review",
+        "frontend-philosophy",
+        "plan-review",
+        "plan-protocol",
+        "atlassian",
+        "github-cli",
+        "python-uv",
+        "review-command"
+      ]
+    },
+    {
+      "name": "coder",
+      "type": "ocx:agent",
+      "description": "Technical implementation specialist",
+      "files": ["agent/coder.md"]
+    },
+    {
+      "name": "researcher",
+      "type": "ocx:agent", 
+      "description": "Knowledge architect for external research",
+      "files": ["agent/researcher.md"],
+      "opencode": {
+        "mcp": {
+          "context7": "https://mcp.context7.com/mcp",
+          "exa": "https://mcp.exa.ai/mcp"
+        }
+      }
+    },
+    {
+      "name": "reviewer",
+      "type": "ocx:agent",
+      "description": "Expert code reviewer",
+      "files": ["agent/reviewer.md"]
+    },
+    {
+      "name": "scribe",
+      "type": "ocx:agent",
+      "description": "Human-facing content specialist",
+      "files": ["agent/scribe.md"]
+    },
+    {
+      "name": "background-agents",
+      "type": "ocx:plugin",
+      "description": "Async delegation system with persistent storage",
+      "files": ["plugin/background-agents.ts"],
+      "dependencies": ["kdco-primitives"]
+    },
+    {
+      "name": "workspace-plugin",
+      "type": "ocx:plugin",
+      "description": "Plan management and rule injection",
+      "files": ["plugin/workspace-plugin.ts"],
+      "dependencies": ["kdco-primitives"]
+    },
+    {
+      "name": "worktree",
+      "type": "ocx:plugin",
+      "description": "Git worktree isolation",
+      "files": [
+        "plugin/worktree.ts",
+        "plugin/worktree/state.ts",
+        "plugin/worktree/terminal.ts"
+      ],
+      "dependencies": ["kdco-primitives"]
+    },
+    {
+      "name": "notify",
+      "type": "ocx:plugin",
+      "description": "OS-level notifications on task completion",
+      "files": ["plugin/notify.ts"],
+      "dependencies": ["kdco-primitives"]
+    },
+    {
+      "name": "kdco-primitives",
+      "type": "ocx:plugin",
+      "description": "Shared utilities for plugins",
+      "files": [
+        "plugin/kdco-primitives/index.ts",
+        "plugin/kdco-primitives/get-project-id.ts",
+        "plugin/kdco-primitives/log-warn.ts",
+        "plugin/kdco-primitives/mutex.ts",
+        "plugin/kdco-primitives/shell.ts",
+        "plugin/kdco-primitives/temp.ts",
+        "plugin/kdco-primitives/terminal-detect.ts",
+        "plugin/kdco-primitives/types.ts",
+        "plugin/kdco-primitives/with-timeout.ts"
+      ]
+    },
+    {
+      "name": "code-philosophy",
+      "type": "ocx:skill",
+      "description": "The 5 Laws of Elegant Defense",
+      "files": ["skill/code-philosophy/SKILL.md"]
+    },
+    {
+      "name": "code-review",
+      "type": "ocx:skill",
+      "description": "Review methodology with severity classification",
+      "files": ["skill/code-review/SKILL.md"]
+    },
+    {
+      "name": "frontend-philosophy",
+      "type": "ocx:skill",
+      "description": "The 5 Pillars of Intentional UI",
+      "files": ["skill/frontend-philosophy/SKILL.md"]
+    },
+    {
+      "name": "plan-review",
+      "type": "ocx:skill",
+      "description": "Implementation plan review criteria",
+      "files": ["skill/plan-review/SKILL.md"]
+    },
+    {
+      "name": "plan-protocol",
+      "type": "ocx:skill",
+      "description": "Implementation planning guidelines with citations",
+      "files": ["skill/plan-protocol/SKILL.md"]
+    },
+    {
+      "name": "atlassian",
+      "type": "ocx:skill",
+      "description": "Atlassian MCP tools for Jira and Confluence",
+      "files": ["skill/atlassian/SKILL.md"],
+      "opencode": {
+        "mcp": {
+          "atlassian": {
+            "type": "local",
+            "command": ["npx", "-y", "mcp-remote@latest", "https://mcp.atlassian.com/v1/mcp"],
+            "enabled": true
+          }
+        }
+      }
+    },
+    {
+      "name": "github-cli",
+      "type": "ocx:skill",
+      "description": "GitHub CLI (gh) operations",
+      "files": ["skill/github-cli/SKILL.md"]
+    },
+    {
+      "name": "python-uv",
+      "type": "ocx:skill",
+      "description": "Python tooling with uv",
+      "files": ["skill/python-uv/SKILL.md"]
+    },
+    {
+      "name": "review-command",
+      "type": "ocx:command",
+      "description": "Code review slash command",
+      "files": ["command/review.md"]
+    }
+  ]
+}

@@ -1,164 +1,91 @@
 # opencode-workspace
 
-Bundled multi-agent orchestration harness for OpenCode. One install, complete control.
+A fork of [kdcokenny/opencode-workspace](https://github.com/kdcokenny/opencode-workspace) with additional skills and Atlassian integration.
 
-> **This is a fork** of [kdcokenny/opencode-workspace](https://github.com/kdcokenny/opencode-workspace) with additional customizations. See [Fork Customizations](#fork-customizations) for details.
-
-## Quick Start (Original Registry)
+## Installation
 
 ```bash
-# One-time setup
-ocx init --global
+# Add this registry
+ocx registry add https://thompsonsed-opencode.workers.dev --name thompsonsed --global
 
-# Install the KDCO workspace profile (OpenCode Free Models Only)
-ocx profile add ws --source tweak/p-1vp4xoqv --from https://tweakoc.com/r --global
+# Install the profile
+ocx profile add ws --from thompsonsed/ws
 
-# Launch
+# Use it
 ocx oc -p ws
 ```
 
-Need a custom profile? Open the KDCO Workspace harness in TweakOC: https://tweakoc.com/h/kdco-workspace
+## What's Included
 
-See the [full installation guide](../../docs/guides/kdco-workspace.mdx) for more customization options.
+| Category | Count | Components |
+|----------|-------|------------|
+| Agents | 4 | coder, researcher, reviewer, scribe |
+| Plugins | 5 | background-agents, workspace-plugin, worktree, notify, kdco-primitives |
+| Skills | 8 | code-philosophy, code-review, frontend-philosophy, plan-review, plan-protocol, atlassian, github-cli, python-uv |
+| Commands | 1 | /review |
 
-## Installation from This Fork
+## Fork Additions
 
-If you want the fork-specific customizations (Atlassian MCP, GitHub Copilot models, additional skills):
+This fork extends upstream with:
+
+| Addition | Description |
+|----------|-------------|
+| **Atlassian MCP** | Jira and Confluence integration via OAuth |
+| **GitHub CLI skill** | `gh` operations for PRs, issues, releases |
+| **Plan protocol skill** | Implementation planning with citations |
+| **Python uv skill** | Python tooling via uv package manager |
+| **GitHub Copilot models** | claude-sonnet-4, claude-opus-4.5, o4-mini, gpt-4.1 |
+
+## Per-Machine Setup
+
+Some integrations require one-time setup:
+
+| Integration | Setup |
+|-------------|-------|
+| **Atlassian** | First use of `atlassian_*` tools triggers OAuth login |
+| **GitHub CLI** | Run `gh auth login` |
+| **Models** | Requires active GitHub Copilot subscription |
+
+## Syncing with Upstream
 
 ```bash
-# Clone directly
-git clone git@github.com:thompsonsed/opencode-workspace.git ~/.config/opencode/profiles/ws
-
-# Or if using OCX, add as local profile
-ocx profile add ws --path ~/.config/opencode/profiles/ws
-```
-
-### Per-Machine Setup
-
-After installation, some integrations require one-time setup:
-
-| Integration | Setup Required |
-|-------------|----------------|
-| **Atlassian MCP** | First use of `atlassian_*` tools will trigger OAuth login |
-| **GitHub CLI** | Ensure `gh auth login` is completed |
-| **Copilot Models** | Requires active GitHub Copilot subscription |
-
-### Syncing with Upstream
-
-To pull in updates from the original repository:
-
-```bash
-cd ~/.config/opencode/profiles/ws
-git remote add upstream git@github.com:kdcokenny/opencode-workspace.git  # one-time
 git fetch upstream
 git merge upstream/main
 ```
 
-## Fork Customizations
-
-This fork extends the upstream with:
-
-| Category | Addition | Description |
-|----------|----------|-------------|
-| Skill | `atlassian` | Atlassian MCP tools for Jira, Confluence, and Compass |
-| Skill | `github-cli` | GitHub CLI (gh) operations for PRs, issues, releases |
-| Skill | `plan-protocol` | Implementation planning with citations |
-| Skill | `python-uv` | Python tooling via uv package manager |
-| MCP | Atlassian | OAuth-based Jira/Confluence integration |
-| Models | GitHub Copilot | claude-sonnet-4, claude-opus-4.5, o4-mini, gpt-4.1 |
-
-## What This Is
-
-A **bundle** — a curated collection of 16 components that work together as a complete AI development harness. Installing `kdco/workspace` gives you:
-
-- 4 plugins (delegation, planning, notifications, worktrees)
-- 2 npm plugins (DCP, markdown table formatter)
-- 3 MCP servers (Context7, Exa, GitHub Grep)
-- 4 agents (researcher, coder, scribe, reviewer)
-- 4 skills (plan protocol, code review, code philosophy, frontend philosophy)
-- 1 command (/review)
-- Orchestrator configurations for plan/build/explore agents
-- Permission boundaries (webfetch deny, agent sandboxing)
-
-## Architecture
-
-```
-┌──────────────────────────────────────────────────────────┐
-│                     ORCHESTRATORS                        │
-│         ┌──────┐                    ┌───────┐            │
-│         │ plan │                    │ build │            │
-│         └──┬───┘                    └───┬───┘            │
-└────────────┼────────────────────────────┼────────────────┘
-             │                            │
-     ┌───────┴───────┐            ┌───────┴───────┐
-     ▼       ▼       ▼            ▼       ▼       ▼
-┌─────────────────────────────────────────────────────────┐
-│                      SPECIALISTS                        │
-│  ┌─────────┐ ┌────────────┐ ┌───────┐ ┌──────┐ ┌──────┐ │
-│  │ explore │ │ researcher │ │ coder │ │scribe│ │review│ │
-│  └─────────┘ └────────────┘ └───────┘ └──────┘ └──────┘ │
-└─────────────────────────────────────────────────────────┘
-```
-
-| Role          | Agents                                             |
-| ------------- | -------------------------------------------------- |
-| Orchestrators | `plan`, `build`                                    |
-| Specialists   | `explore`, `researcher`, `coder`, `scribe`, `reviewer` |
-
-## Components
-
-| Category | Component           | Description                                  |
-| -------- | ------------------- | -------------------------------------------- |
-| Plugin   | workspace-plugin    | Plan management, agent rule injection        |
-| Plugin   | background-agents   | Async delegation system                      |
-| Plugin   | notify              | OS notifications on completion               |
-| Plugin   | worktree            | Git worktree isolation                       |
-| Plugin   | @tarquinen/opencode-dcp | Differential context protocol          |
-| Plugin   | @franlol/opencode-md-table-formatter | Markdown table formatting |
-| Skill    | plan-protocol       | Implementation planning guidelines           |
-| Skill    | code-review         | Review methodology + severity classification |
-| Skill    | code-philosophy     | Internal logic philosophy (5 Laws)           |
-| Skill    | frontend-philosophy | Visual/UI philosophy (5 Pillars)             |
-| Agent    | researcher          | External research (MCP tools, read-only)     |
-| Agent    | coder               | Implementation (full file + bash)            |
-| Agent    | scribe              | Documentation (write, no bash)               |
-| Agent    | reviewer            | Code review (read-only + git)                |
-| Command  | review              | `/review` slash command                      |
-| Bundle   | philosophy          | Code + frontend philosophy skills            |
-| MCP      | context7            | Library documentation lookup                 |
-| MCP      | exa                 | Web search for external research             |
-| MCP      | gh_grep             | GitHub code search                           |
-
-## Permissions
-
-The bundle configures security boundaries:
-
-| Scope      | Setting                                                  |
-| ---------- | -------------------------------------------------------- |
-| Global     | `webfetch: deny` — no direct web fetching                |
-| plan       | Read-only orchestrator, delegates via `task` tool        |
-| build      | Read-only orchestrator, delegates via `task` tool        |
-| explore    | Read-only specialist, filesystem + git inspection only   |
-| researcher | Read-only, MCP tools only (Context7, Exa, GitHub Grep)   |
-| coder      | Full file + bash access                                  |
-| scribe     | File write only, no bash                                 |
-| reviewer   | Read-only + git inspection                               |
-
-## Advanced: Direct Install (No Profile)
+If you haven't added the upstream remote:
 
 ```bash
-ocx add kdco/workspace --from https://registry.kdco.dev
+git remote add upstream git@github.com:kdcokenny/opencode-workspace.git
 ```
 
-If you don't have OCX installed, install it from the [OCX repository](https://github.com/kdcokenny/ocx).
+## Self-Hosting
 
-## Owning Your Code
+Deploy your own fork as an OCX registry:
 
-Every file in this bundle is synced to this repository. Fork it, modify the agents, tune the skills, make it yours. That's the point of OCX.
+```bash
+bun install
+bun run build
+bun run deploy  # requires wrangler login
+```
 
-## Disclaimer
+This deploys to Cloudflare Workers. Update the registry URL in your installation instructions after deployment.
 
-This project is not built by the OpenCode team and is not affiliated with [OpenCode](https://github.com/sst/opencode) in any way.
+## Versioned Releases
+
+Each release creates:
+- A versioned deployment at `/vX.X.X/` on GitHub Pages
+- A profile tarball attached as a release asset
+- Automatic cleanup keeps the 5 most recent versions
+
+To install a specific version:
+```bash
+# Download release asset
+gh release download v1.0.0 -A tar.gz
+
+# Or use the versioned URL
+https://thompsonsed.github.io/opencode-workspace/v1.0.0/
+```
 
 ## License
 
