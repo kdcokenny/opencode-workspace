@@ -1,28 +1,251 @@
-name: Build Registry
+name: Deploy Registry
 
 on:
+  push:
+    branches: [main]
   release:
     types: [published]
   workflow_dispatch:
 
+# Minimal default permissions (Issue #6)
 permissions:
-  contents: write
+  contents: read
+
+# Fixed concurrency group for ALL deployments to prevent race conditions (Issue #3)
+concurrency:
+  group: pages-deployment
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is_release: ${{ steps.version.outputs.is_release }}
     steps:
       - uses: actions/checkout@v4
-      
-      - uses: oven-sh/setup-bun@v1
-      - run: bun install
-      - run: bun run build
-      
-      - name: Upload build artifacts to release
-        if: github.event_name == 'release'
-        env:
-          GH_TOKEN: ${{ github.token }}
+
+      - name: Determine version
+        id: version
         run: |
-          cd dist
-          zip -r registry.zip .
-          gh release upload ${{ github.event.release.tag_name }} registry.zip
+          if [ "${{ github.event_name }}" = "release" ]; then
+            # Extract version from tag, remove 'v' prefix if present
+            VERSION="${{ github.event.release.tag_name }}"
+            VERSION="${VERSION#v}"
+            
+            # Validate version format - semver (Issue #1)
+            if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$'; then
+              echo "Error: Invalid version format: $VERSION"
+              exit 1
+            fi
+            
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "is_release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=latest" >> "$GITHUB_OUTPUT"
+            echo "is_release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build registry
+        run: bun run build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: registry-dist
+          path: dist/
+          retention-days: 1
+
+  # Deploy to GitHub Pages root (latest from main)
+  deploy-latest:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: registry-dist
+          path: dist/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload to Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  # Deploy versioned release to subdirectory and upload assets
+  deploy-release:
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: registry-dist
+          path: dist/
+
+      - name: Create ws profile tarball
+        run: |
+          VERSION="${{ needs.build.outputs.version }}"
+          
+          # Validate version format - semver (Issue #1)
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$'; then
+            echo "Error: Invalid version format: $VERSION"
+            exit 1
+          fi
+          
+          tar -czf "ws-profile-v${VERSION}.tar.gz" -C files/profiles/ws .
+          echo "Created ws-profile-v${VERSION}.tar.gz"
+
+      - name: Upload tarball to release
+        run: |
+          VERSION="${{ needs.build.outputs.version }}"
+          
+          # Validate version format - semver (Issue #1)
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$'; then
+            echo "Error: Invalid version format: $VERSION"
+            exit 1
+          fi
+          
+          gh release upload "${{ github.event.release.tag_name }}" "ws-profile-v${VERSION}.tar.gz" --clobber
+
+      - name: Build versioned Pages structure
+        run: |
+          VERSION="${{ needs.build.outputs.version }}"
+          
+          # Validate version format - semver (Issue #1)
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$'; then
+            echo "Error: Invalid version format: $VERSION"
+            exit 1
+          fi
+          
+          # Create pages directory with latest content at root
+          mkdir -p pages-content
+          cp -r dist/. pages-content/
+          
+          # Create versioned subdirectory for current release
+          mkdir -p "pages-content/v${VERSION}"
+          cp -r dist/. "pages-content/v${VERSION}/"
+          
+          # Get last 5 release tags (including current) to reconstruct
+          TAGS=$(gh release list --limit 5 --json tagName --jq '.[].tagName')
+          echo "Recent releases: $TAGS"
+          
+          for TAG in $TAGS; do
+            # Validate tag format - semver with optional 'v' prefix (Issue #1)
+            if ! echo "$TAG" | grep -qE '^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$'; then
+              echo "Warning: Skipping invalid tag format: $TAG"
+              continue
+            fi
+            
+            TAG_VERSION="${TAG#v}"
+            
+            # Skip current version (already handled) and empty tags
+            if [ "$TAG_VERSION" = "$VERSION" ] || [ -z "$TAG_VERSION" ]; then
+              continue
+            fi
+            
+            echo "Rebuilding version: $TAG_VERSION from tag $TAG"
+            
+            # Use git worktree for isolation instead of checkout/stash (Issue #4)
+            WORKTREE="build-${TAG_VERSION}"
+            git worktree add "$WORKTREE" "$TAG" 2>/dev/null || continue
+            
+            (
+              cd "$WORKTREE"
+              bun install --frozen-lockfile 2>/dev/null || bun install
+              bun run build 2>/dev/null || bunx ocx build . --out dist
+              
+              # Validate build output before copying (Issue #5)
+              if [ -d dist ] && [ "$(ls -A dist)" ]; then
+                mkdir -p "../pages-content/v${TAG_VERSION}"
+                cp -r dist/. "../pages-content/v${TAG_VERSION}/"
+              else
+                echo "Warning: Build failed for $TAG_VERSION, skipping"
+              fi
+            )
+            
+            git worktree remove "$WORKTREE" --force
+          done
+          
+          # Cleanup: Keep only 5 total versions (including current) (Issue #7)
+          echo "Cleaning up old versions..."
+          cd pages-content
+          
+          CURRENT_VERSION="v${VERSION}"
+          
+          # Get all version directories except current
+          OTHER_VERSIONS=$(ls -d v* 2>/dev/null | grep -v "^${CURRENT_VERSION}$" | sort -V || echo "")
+          
+          if [ -n "$OTHER_VERSIONS" ]; then
+            # Keep current + 4 most recent others = 5 total
+            KEEP_OTHERS=$(echo "$OTHER_VERSIONS" | tail -4)
+            
+            for DIR in $OTHER_VERSIONS; do
+              if ! echo "$KEEP_OTHERS" | grep -q "^${DIR}$"; then
+                echo "  Removing old version: $DIR"
+                rm -rf "$DIR"
+              fi
+            done
+            
+            echo "Kept versions: $CURRENT_VERSION $(echo $KEEP_OTHERS | tr '\n' ' ')"
+          else
+            echo "No old versions to clean up"
+          fi
+          
+          cd ..
+          
+          echo "Final pages structure:"
+          ls -la pages-content/
+          for DIR in pages-content/v*/; do
+            echo "  $DIR: $(ls $DIR | wc -l) files"
+          done
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload to Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages-content/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
