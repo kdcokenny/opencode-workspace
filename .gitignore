@@ -1,3 +1,4 @@
+.opencode
 dist/
 node_modules/
 .wrangler/

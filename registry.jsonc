@@ -1,5 +1,5 @@
 {
-  "$schema": "https://ocx.kdco.dev/schemas/registry.json",
+  "$schema": "https://ocx.kdco.dev/schemas/v2/registry.json",
   "name": "Thompson OpenCode Workspace",
   "namespace": "thompsonsed",
   "version": "1.0.0",
