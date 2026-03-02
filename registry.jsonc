@@ -1,7 +1,6 @@
 {
   "$schema": "https://ocx.kdco.dev/schemas/v2/registry.json",
   "name": "Thompson OpenCode Workspace",
-  "namespace": "thompsonsed",
   "version": "1.0.0",
   "author": "Sam Thompson",
   "opencode": "1.0.0",
