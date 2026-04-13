@@ -56,9 +56,9 @@ A **bundle** — a curated collection of components that work together as a comp
 
 - 4 plugins (delegation, planning, notifications, worktrees)
 - 2 npm plugins (DCP, markdown table formatter)
-- 4 MCP servers (Context7, Exa, GitHub Grep, Atlassian)
+- 5 MCP servers (Context7, Exa, GitHub Grep, Atlassian, OpenTargets)
 - 4 agents (researcher, coder, scribe, reviewer)
-- 8 skills (plan protocol, plan review, code review, code philosophy, frontend philosophy, atlassian, github-cli, python-uv)
+- 20 skills (8 development + 12 scientific research skills)
 - 1 command (/review)
 - Orchestrator configurations for plan/build/explore agents
 - Permission boundaries (webfetch deny, agent sandboxing)
@@ -106,6 +106,19 @@ A **bundle** — a curated collection of components that work together as a comp
 | Skill    | atlassian           | Atlassian MCP for Jira/Confluence            |
 | Skill    | github-cli          | GitHub CLI (gh) operations                   |
 | Skill    | python-uv           | Python tooling with uv                       |
+| Skill    | scanpy              | Single-cell RNA-seq analysis                 |
+| Skill    | scvelo              | RNA velocity analysis                        |
+| Skill    | scvi-tools          | Deep generative models for single-cell       |
+| Skill    | anndata             | AnnData data structure                       |
+| Skill    | cellxgene-census    | Query CELLxGENE Census (61M+ cells)          |
+| Skill    | pydeseq2            | Differential gene expression                 |
+| Skill    | database-lookup     | Search 78+ public scientific databases       |
+| Skill    | gget                | Fast queries to 20+ bioinformatics DBs       |
+| Skill    | bioservices         | Unified interface to 40+ bio services        |
+| Skill    | rdkit               | Cheminformatics molecular toolkit            |
+| Skill    | datamol             | Pythonic RDKit wrapper                       |
+| Skill    | deepchem            | Deep learning for chemistry                  |
+| MCP      | opentargets         | Target-disease associations (78K+ targets)   |
 | Agent    | researcher          | External research (MCP tools, read-only)     |
 | Agent    | coder               | Implementation (full file + bash)            |
 | Agent    | scribe              | Documentation (write, no bash)               |
@@ -127,7 +140,7 @@ The bundle configures security boundaries:
 | plan       | Read-only orchestrator, delegates via `task` tool        |
 | build      | Read-only orchestrator, delegates via `task` tool        |
 | explore    | Read-only specialist, filesystem + git inspection only   |
-| researcher | Read-only, MCP tools (Context7, Exa, GitHub Grep, Atlassian) |
+| researcher | Read-only, MCP tools (Context7, Exa, GitHub Grep, Atlassian, OpenTargets) |
 | coder      | Full file + bash access                                  |
 | scribe     | File write only, no bash                                 |
 | reviewer   | Read-only + git inspection                               |
@@ -138,18 +151,18 @@ The bundle configures security boundaries:
 |----------|-------|------------|
 | Agents | 4 | coder, researcher, reviewer, scribe |
 | Plugins | 5 | background-agents, workspace-plugin, worktree, notify, kdco-primitives |
-| Skills | 8 | code-philosophy, code-review, frontend-philosophy, plan-review, plan-protocol, atlassian, github-cli, python-uv |
-| MCPs | 4 | context7, exa, gh_grep, atlassian |
+| Skills | 20 | 8 development skills + 12 scientific research skills |
+| MCPs | 5 | context7, exa, gh_grep, atlassian, opentargets |
 | Commands | 1 | /review |
 
 ### Profile: ws
 
 The `ws` profile bundles all components with pre-configured settings:
 - **Agents**: coder, researcher, reviewer, scribe (with explore for codebase analysis)
-- **Models**: GitHub Copilot models (claude-opus-4.5, claude-sonnet-4.5, claude-haiku-4.5)
+- **Models**: GitHub Copilot models (claude-opus-4.6, claude-sonnet-4.6, claude-haiku-4.6)
 - **Plugins**: Background delegation, plan management, git worktree isolation, notifications
-- **Skills**: code-philosophy, code-review, frontend-philosophy, plan-protocol, plan-review, atlassian, github-cli, python-uv
-- **MCP Servers**: Atlassian, Context7, Exa, GitHub grep
+- **Skills**: 8 development skills (code-philosophy, code-review, frontend-philosophy, plan-protocol, plan-review, atlassian, github-cli, python-uv) + 12 scientific skills (scanpy, scvelo, scvi-tools, anndata, cellxgene-census, pydeseq2, database-lookup, gget, bioservices, rdkit, datamol, deepchem)
+- **MCP Servers**: Atlassian, Context7, Exa, GitHub grep, OpenTargets
 
 ## Fork Additions
 
@@ -161,7 +174,9 @@ This fork extends upstream with:
 | **GitHub CLI skill** | `gh` operations for PRs, issues, releases |
 | **Plan protocol skill** | Implementation planning with citations |
 | **Python uv skill** | Python tooling via uv package manager |
-| **GitHub Copilot models** | claude-sonnet-4, claude-opus-4.5, o4-mini, gpt-4.1 |
+| **OpenTargets MCP** | Target-disease associations for drug discovery |
+| **Scientific skills (12)** | Single-cell omics, database access, cheminformatics |
+| **GitHub Copilot models** | claude-opus-4.6, claude-sonnet-4.6, claude-haiku-4.6 |
 
 ## Per-Machine Setup
 

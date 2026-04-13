@@ -1,13 +1,13 @@
 {
 	"$schema": "https://opencode.ai/config.json",
 	// Free OpenCode Zen models - no API keys required
-	"model": "github-copilot/claude-opus-4.5",
-	"small_model": "github-copilot/claude-haiku-4.5",
+	"model": "github-copilot/claude-sonnet-4.6",
+	"small_model": "github-copilot/claude-haiku-4.6",
 
 	"agent": {
 		// Orchestrators
 		"plan": {
-			"model": "github-copilot/claude-opus-4.5",
+			"model": "github-copilot/claude-opus-4.6",
 			"temperature": 0.3,
 			"reasoningEffort": "high",
 			"textVerbosity": "low",
@@ -22,7 +22,7 @@
 			}
 		},
 		"build": {
-			"model": "github-copilot/claude-opus-4.5",
+			"model": "github-copilot/claude-sonnet-4.6",
 			"temperature": 0.3,
 			"reasoningEffort": "medium",
 			"textVerbosity": "low",
@@ -41,7 +41,7 @@
 
 		// Implementation
 		"coder": {
-			"model": "github-copilot/claude-opus-4.5",
+			"model": "github-copilot/claude-opus-4.6",
 			"temperature": 0.2,
 			"reasoningEffort": "high",
 			"textVerbosity": "low",
@@ -63,7 +63,7 @@
 
 		// Specialists
 		"explore": {
-			"model": "github-copilot/claude-haiku-4.5",
+			"model": "github-copilot/claude-haiku-4.6",
 			"temperature": 0.2,
 			"reasoningEffort": "low",
 			"textVerbosity": "low",
@@ -106,7 +106,7 @@
 			}
 		},
 		"researcher": {
-			"model": "github-copilot/claude-sonnet-4.5",
+			"model": "github-copilot/claude-sonnet-4.6",
 			"temperature": 0.4,
 			"reasoningEffort": "high",
 			"textVerbosity": "medium",
@@ -115,6 +115,7 @@
 			"exa_*": "allow",
 			"gh_grep_*": "allow",
 			"atlassian_*": "allow",
+			"opentargets_*": "allow",
 			"kagi_*": "deny",
 			"webfetch": "allow",
 			"write": "deny",
@@ -168,7 +169,7 @@
 			}
 		},
 		"scribe": {
-			"model": "github-copilot/claude-haiku-4.5",
+			"model": "github-copilot/claude-haiku-4.6",
 			"temperature": 1,
 			"reasoningEffort": "low",
 			"textVerbosity": "high",
@@ -185,7 +186,7 @@
 			}
 		},
 		"reviewer": {
-			"model": "github-copilot/claude-sonnet-4.5",
+			"model": "github-copilot/claude-sonnet-4.6",
 			"temperature": 0.1,
 			"reasoningEffort": "high",
 			"textVerbosity": "medium",
@@ -214,7 +215,8 @@
 		"kagi_*": "deny",
 		"webfetch": "deny",
 		"worktree_*": "deny",
-		"atlassian_*": "allow"
+		"atlassian_*": "allow",
+		"opentargets_*": "deny"
 	},
 	"mcp": {
 		"context7": {
@@ -235,6 +237,11 @@
 		"atlassian": {
 			"type": "local",
 			"command": ["npx", "-y", "mcp-remote@latest", "https://mcp.atlassian.com/v1/mcp"],
+			"enabled": true
+		},
+		"opentargets": {
+			"type": "remote",
+			"url": "https://mcp.platform.opentargets.org/mcp",
 			"enabled": true
 		}
 	},

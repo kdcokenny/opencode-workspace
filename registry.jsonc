@@ -38,6 +38,18 @@
         "atlassian",
         "github-cli",
         "python-uv",
+        "scanpy",
+        "scvelo",
+        "scvi-tools",
+        "anndata",
+        "cellxgene-census",
+        "pydeseq2",
+        "database-lookup",
+        "gget",
+        "bioservices",
+        "rdkit",
+        "datamol",
+        "deepchem",
         "review-command"
       ]
     },
@@ -175,6 +187,102 @@
       "description": "Python tooling with uv",
       "files": [
         { "path": "skill/python-uv/SKILL.md", "target": "skills/python-uv/SKILL.md" }
+      ]
+    },
+    {
+      "name": "scanpy",
+      "type": "skill",
+      "description": "Single-cell RNA-seq analysis workflows",
+      "files": [
+        { "path": "skill/scanpy/SKILL.md", "target": "skills/scanpy/SKILL.md" }
+      ]
+    },
+    {
+      "name": "scvelo",
+      "type": "skill",
+      "description": "RNA velocity analysis",
+      "files": [
+        { "path": "skill/scvelo/SKILL.md", "target": "skills/scvelo/SKILL.md" }
+      ]
+    },
+    {
+      "name": "scvi-tools",
+      "type": "skill",
+      "description": "Deep generative models for single-cell omics",
+      "files": [
+        { "path": "skill/scvi-tools/SKILL.md", "target": "skills/scvi-tools/SKILL.md" }
+      ]
+    },
+    {
+      "name": "anndata",
+      "type": "skill",
+      "description": "AnnData data structure for single-cell",
+      "files": [
+        { "path": "skill/anndata/SKILL.md", "target": "skills/anndata/SKILL.md" }
+      ]
+    },
+    {
+      "name": "cellxgene-census",
+      "type": "skill",
+      "description": "Query CELLxGENE Census (61M+ cells)",
+      "files": [
+        { "path": "skill/cellxgene-census/SKILL.md", "target": "skills/cellxgene-census/SKILL.md" }
+      ]
+    },
+    {
+      "name": "pydeseq2",
+      "type": "skill",
+      "description": "Differential gene expression analysis",
+      "files": [
+        { "path": "skill/pydeseq2/SKILL.md", "target": "skills/pydeseq2/SKILL.md" }
+      ]
+    },
+    {
+      "name": "database-lookup",
+      "type": "skill",
+      "description": "Search 78+ public scientific databases",
+      "files": [
+        { "path": "skill/database-lookup/SKILL.md", "target": "skills/database-lookup/SKILL.md" }
+      ]
+    },
+    {
+      "name": "gget",
+      "type": "skill",
+      "description": "Fast queries to 20+ bioinformatics databases",
+      "files": [
+        { "path": "skill/gget/SKILL.md", "target": "skills/gget/SKILL.md" }
+      ]
+    },
+    {
+      "name": "bioservices",
+      "type": "skill",
+      "description": "Unified interface to 40+ bioinformatics services",
+      "files": [
+        { "path": "skill/bioservices/SKILL.md", "target": "skills/bioservices/SKILL.md" }
+      ]
+    },
+    {
+      "name": "rdkit",
+      "type": "skill",
+      "description": "Cheminformatics toolkit for molecular manipulation",
+      "files": [
+        { "path": "skill/rdkit/SKILL.md", "target": "skills/rdkit/SKILL.md" }
+      ]
+    },
+    {
+      "name": "datamol",
+      "type": "skill",
+      "description": "Pythonic RDKit wrapper for drug discovery",
+      "files": [
+        { "path": "skill/datamol/SKILL.md", "target": "skills/datamol/SKILL.md" }
+      ]
+    },
+    {
+      "name": "deepchem",
+      "type": "skill",
+      "description": "Deep learning for chemistry and drug discovery",
+      "files": [
+        { "path": "skill/deepchem/SKILL.md", "target": "skills/deepchem/SKILL.md" }
       ]
     },
     {
