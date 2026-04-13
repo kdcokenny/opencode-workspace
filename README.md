@@ -24,10 +24,7 @@ Once the registry is added, install the `ws` profile:
 
 ```bash
 # Install ws profile from registry
-ocx profile add thompsonsed/ws
-
-# Or with explicit naming
-ocx profile add my-workspace --source thompsonsed/ws --global
+ocx profile add ws --from thompsonsed/ws --global
 ```
 
 ### Direct Profile Download (Alternative)
@@ -44,7 +41,7 @@ curl -L https://github.com/thompsonsed/opencode-workspace/releases/download/v1.0
 ```bash
 # Add registry and install profile in one session
 ocx registry add https://thompsonsed.github.io/opencode-workspace --name thompsonsed --global
-ocx profile add thompsonsed/ws
+ocx profile add ws --from thompsonsed/ws --global
 
 # Use the profile
 ocx oc -p ws
