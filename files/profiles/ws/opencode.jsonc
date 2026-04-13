@@ -240,9 +240,8 @@
 			"enabled": true
 		},
 		"opentargets": {
-			"type": "local",
-			"command": "uvx",
-			"args": ["--from", "git+https://github.com/opentargets/open-targets-platform-mcp", "otp-mcp", "--jq"],
+			"type": "remote",
+			"url": "https://mcp.platform.opentargets.org/mcp",
 			"enabled": true
 		}
 	},
