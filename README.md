@@ -2,6 +2,8 @@
 
 A fork of [kdcokenny/opencode-workspace](https://github.com/kdcokenny/opencode-workspace) with additional skills and Atlassian integration.
 
+Bundled multi-agent orchestration harness for OpenCode. One install, complete control.
+
 ## Installation
 
 ### Registry Installation
@@ -47,6 +49,83 @@ ocx profile add thompsonsed/ws
 # Use the profile
 ocx oc -p ws
 ```
+
+## What This Is
+
+A **bundle** — a curated collection of 16 components that work together as a complete AI development harness. Installing `kdco/workspace` gives you:
+
+- 4 plugins (delegation, planning, notifications, worktrees)
+- 2 npm plugins (DCP, markdown table formatter)
+- 3 MCP servers (Context7, Exa, GitHub Grep)
+- 4 agents (researcher, coder, scribe, reviewer)
+- 4 skills (plan protocol, code review, code philosophy, frontend philosophy)
+- 1 command (/review)
+- Orchestrator configurations for plan/build/explore agents
+- Permission boundaries (webfetch deny, agent sandboxing)
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                     ORCHESTRATORS                        │
+│         ┌──────┐                    ┌───────┐            │
+│         │ plan │                    │ build │            │
+│         └──┬───┘                    └───┬───┘            │
+└────────────┼────────────────────────────┼────────────────┘
+             │                            │
+     ┌───────┴───────┐            ┌───────┴───────┐
+     ▼       ▼       ▼            ▼       ▼       ▼
+┌─────────────────────────────────────────────────────────┐
+│                      SPECIALISTS                        │
+│  ┌─────────┐ ┌────────────┐ ┌───────┐ ┌──────┐ ┌──────┐ │
+│  │ explore │ │ researcher │ │ coder │ │scribe│ │review│ │
+│  └─────────┘ └────────────┘ └───────┘ └──────┘ └──────┘ │
+└─────────────────────────────────────────────────────────┘
+```
+
+| Role          | Agents                                             |
+| ------------- | -------------------------------------------------- |
+| Orchestrators | `plan`, `build`                                    |
+| Specialists   | `explore`, `researcher`, `coder`, `scribe`, `reviewer` |
+
+## Components
+
+| Category | Component           | Description                                  |
+| -------- | ------------------- | -------------------------------------------- |
+| Plugin   | workspace-plugin    | Plan management, agent rule injection        |
+| Plugin   | background-agents   | Async delegation system                      |
+| Plugin   | notify              | OS notifications on completion               |
+| Plugin   | worktree            | Git worktree isolation                       |
+| Plugin   | @tarquinen/opencode-dcp | Differential context protocol          |
+| Plugin   | @franlol/opencode-md-table-formatter | Markdown table formatting |
+| Skill    | plan-protocol       | Implementation planning guidelines           |
+| Skill    | code-review         | Review methodology + severity classification |
+| Skill    | code-philosophy     | Internal logic philosophy (5 Laws)           |
+| Skill    | frontend-philosophy | Visual/UI philosophy (5 Pillars)             |
+| Agent    | researcher          | External research (MCP tools, read-only)     |
+| Agent    | coder               | Implementation (full file + bash)            |
+| Agent    | scribe              | Documentation (write, no bash)               |
+| Agent    | reviewer            | Code review (read-only + git)                |
+| Command  | review              | `/review` slash command                      |
+| Bundle   | philosophy          | Code + frontend philosophy skills            |
+| MCP      | context7            | Library documentation lookup                 |
+| MCP      | exa                 | Web search for external research             |
+| MCP      | gh_grep             | GitHub code search                           |
+
+## Permissions
+
+The bundle configures security boundaries:
+
+| Scope      | Setting                                                  |
+| ---------- | -------------------------------------------------------- |
+| Global     | `webfetch: deny` — no direct web fetching                |
+| plan       | Read-only orchestrator, delegates via `task` tool        |
+| build      | Read-only orchestrator, delegates via `task` tool        |
+| explore    | Read-only specialist, filesystem + git inspection only   |
+| researcher | Read-only, MCP tools only (Context7, Exa, GitHub Grep)   |
+| coder      | Full file + bash access                                  |
+| scribe     | File write only, no bash                                 |
+| reviewer   | Read-only + git inspection                               |
 
 ## What's Included
 
@@ -147,6 +226,23 @@ https://thompsonsed.github.io/opencode-workspace/v1.0.0/
 ### Version Cleanup
 
 The workflow automatically maintains only the last 5 version directories on GitHub Pages. Older versions are removed during each release deployment to keep storage usage low.
+
+## Contributing
+
+This facade is maintained from the main [OCX monorepo](https://github.com/kdcokenny/ocx).
+
+If you want to update opencode-workspace itself, start here:
+
+- https://github.com/kdcokenny/ocx/blob/main/workers/kdco-registry/files/plugins/workspace-plugin.ts
+- https://github.com/kdcokenny/ocx/tree/main/workers/kdco-registry/files
+
+- Open issues here: https://github.com/kdcokenny/ocx/issues/new
+- Open pull requests here: https://github.com/kdcokenny/ocx/compare
+- Please do **not** open issues or PRs in this facade repository.
+
+## Disclaimer
+
+This is a fork with additional customizations. For the original upstream, see [kdcokenny/opencode-workspace](https://github.com/kdcokenny/opencode-workspace).
 
 ## License
 

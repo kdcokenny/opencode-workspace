@@ -67,6 +67,14 @@ Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 - Structure with clear headings for scannability
 - Keep paragraphs short (3-4 sentences max)
 
+### AGENTS.md Location Guidelines
+
+- **Profile instructions** → Place in profile's `AGENTS.md` (`~/.config/opencode/profiles/{name}/AGENTS.md`)
+- **Project instructions** → Place in project root `AGENTS.md` or `.opencode/AGENTS.md`
+- **Discovery behavior** → OCX walks up from project directory to git root, finding instruction files at each level
+- **Filtering** → Profile's `exclude`/`include` patterns control which project files OpenCode sees
+- **Note** → Project AGENTS.md may be excluded by profile patterns; check your profile's `ocx.jsonc`
+
 ## FORBIDDEN ACTIONS
 
 - NEVER execute shell commands - you create content, not run commands
