@@ -52,13 +52,13 @@ ocx oc -p ws
 
 ## What This Is
 
-A **bundle** — a curated collection of 16 components that work together as a complete AI development harness. Installing `kdco/workspace` gives you:
+A **bundle** — a curated collection of components that work together as a complete AI development harness. Installing `kdco/workspace` gives you:
 
 - 4 plugins (delegation, planning, notifications, worktrees)
 - 2 npm plugins (DCP, markdown table formatter)
-- 3 MCP servers (Context7, Exa, GitHub Grep)
+- 4 MCP servers (Context7, Exa, GitHub Grep, Atlassian)
 - 4 agents (researcher, coder, scribe, reviewer)
-- 4 skills (plan protocol, code review, code philosophy, frontend philosophy)
+- 8 skills (plan protocol, plan review, code review, code philosophy, frontend philosophy, atlassian, github-cli, python-uv)
 - 1 command (/review)
 - Orchestrator configurations for plan/build/explore agents
 - Permission boundaries (webfetch deny, agent sandboxing)
@@ -99,9 +99,13 @@ A **bundle** — a curated collection of 16 components that work together as a c
 | Plugin   | @tarquinen/opencode-dcp | Differential context protocol          |
 | Plugin   | @franlol/opencode-md-table-formatter | Markdown table formatting |
 | Skill    | plan-protocol       | Implementation planning guidelines           |
+| Skill    | plan-review         | Implementation plan review criteria          |
 | Skill    | code-review         | Review methodology + severity classification |
 | Skill    | code-philosophy     | Internal logic philosophy (5 Laws)           |
 | Skill    | frontend-philosophy | Visual/UI philosophy (5 Pillars)             |
+| Skill    | atlassian           | Atlassian MCP for Jira/Confluence            |
+| Skill    | github-cli          | GitHub CLI (gh) operations                   |
+| Skill    | python-uv           | Python tooling with uv                       |
 | Agent    | researcher          | External research (MCP tools, read-only)     |
 | Agent    | coder               | Implementation (full file + bash)            |
 | Agent    | scribe              | Documentation (write, no bash)               |
@@ -111,6 +115,7 @@ A **bundle** — a curated collection of 16 components that work together as a c
 | MCP      | context7            | Library documentation lookup                 |
 | MCP      | exa                 | Web search for external research             |
 | MCP      | gh_grep             | GitHub code search                           |
+| MCP      | atlassian           | Jira and Confluence via OAuth                |
 
 ## Permissions
 
@@ -122,7 +127,7 @@ The bundle configures security boundaries:
 | plan       | Read-only orchestrator, delegates via `task` tool        |
 | build      | Read-only orchestrator, delegates via `task` tool        |
 | explore    | Read-only specialist, filesystem + git inspection only   |
-| researcher | Read-only, MCP tools only (Context7, Exa, GitHub Grep)   |
+| researcher | Read-only, MCP tools (Context7, Exa, GitHub Grep, Atlassian) |
 | coder      | Full file + bash access                                  |
 | scribe     | File write only, no bash                                 |
 | reviewer   | Read-only + git inspection                               |
@@ -134,6 +139,7 @@ The bundle configures security boundaries:
 | Agents | 4 | coder, researcher, reviewer, scribe |
 | Plugins | 5 | background-agents, workspace-plugin, worktree, notify, kdco-primitives |
 | Skills | 8 | code-philosophy, code-review, frontend-philosophy, plan-review, plan-protocol, atlassian, github-cli, python-uv |
+| MCPs | 4 | context7, exa, gh_grep, atlassian |
 | Commands | 1 | /review |
 
 ### Profile: ws
@@ -142,7 +148,7 @@ The `ws` profile bundles all components with pre-configured settings:
 - **Agents**: coder, researcher, reviewer, scribe (with explore for codebase analysis)
 - **Models**: GitHub Copilot models (claude-opus-4.5, claude-sonnet-4.5, claude-haiku-4.5)
 - **Plugins**: Background delegation, plan management, git worktree isolation, notifications
-- **Skills**: Code philosophy, code review, frontend philosophy, planning protocols
+- **Skills**: code-philosophy, code-review, frontend-philosophy, plan-protocol, plan-review, atlassian, github-cli, python-uv
 - **MCP Servers**: Atlassian, Context7, Exa, GitHub grep
 
 ## Fork Additions
