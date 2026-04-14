@@ -15,7 +15,7 @@ Add the registry to install components from it:
 ocx registry add https://thompsonsed.github.io/opencode-workspace --name thompsonsed --global
 
 # Specific version (pinned)
-ocx registry add https://thompsonsed.github.io/opencode-workspace/v1.0.0 --name thompsonsed-v1 --global
+ocx registry add https://thompsonsed.github.io/opencode-workspace/v2.0.0 --name thompsonsed-v1 --global
 ```
 
 ### Profile Installation
