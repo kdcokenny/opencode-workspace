@@ -50,6 +50,7 @@
         "rdkit",
         "datamol",
         "deepchem",
+        "open-targets",
         "review-command"
       ]
     },
@@ -283,6 +284,14 @@
       "description": "Deep learning for chemistry and drug discovery",
       "files": [
         { "path": "skill/deepchem/SKILL.md", "target": "skills/deepchem/SKILL.md" }
+      ]
+    },
+    {
+      "name": "open-targets",
+      "type": "skill",
+      "description": "Open Targets Platform for target-disease associations and genetic evidence",
+      "files": [
+        { "path": "skill/open-targets/SKILL.md", "target": "skills/open-targets/SKILL.md" }
       ]
     },
     {
