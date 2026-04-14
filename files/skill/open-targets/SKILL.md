@@ -1,3 +1,5 @@
+> WARNING Build agent - delegation required: The opentargets_* tools are only available to the researcher agent. Always delegate Open Targets queries via task(subagent_type: "researcher").
+
 ---
 name: open-targets
 description: Open Targets Platform MCP tools - use for target-disease associations, drug-target queries, and genetic evidence via the Open Targets MCP server
