@@ -64,14 +64,24 @@ export async function sendMacOSAlerterNotification(
 		}
 
 		const alerterArguments = buildAlerterArguments(options)
-		const spawnProcess = runtime.spawnProcess ?? ((argv: string[]) => Bun.spawn(argv, { stdout: "ignore", stderr: "pipe" }))
+		const spawnProcess = runtime.spawnProcess ?? ((argv: string[]) => Bun.spawn(argv, { stdout: "ignore", stderr: "ignore" }))
 		const process = spawnProcess([alerterPath, ...alerterArguments.slice(1)])
-		const exitCode = await process.exited
 
-		if (exitCode === 0) return true
+		// Alerter exits only after the user interacts with or dismisses the notification.
+		// Observe failures without blocking the OpenCode hook that triggered it.
+		void process.exited.then(
+			(exitCode) => {
+				if (exitCode !== 0) {
+					warn(`notify: macOS desktop notification exited with code ${exitCode}.`)
+				}
+			},
+			(error: unknown) => {
+				const message = error instanceof Error ? error.message : String(error)
+				warn(`notify: macOS desktop notification process failed (${message}).`)
+			},
+		)
 
-		warn(`notify: macOS desktop notification skipped; alerter exited with code ${exitCode}.`)
-		return false
+		return true
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error)
 		warn(`notify: macOS desktop notification skipped; alerter failed (${message}).`)
