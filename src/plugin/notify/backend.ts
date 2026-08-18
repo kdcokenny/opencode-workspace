@@ -10,6 +10,7 @@ export interface DesktopNotificationOptions {
 	subtitle?: string
 	sound?: string
 	senderBundleId?: string | null
+	timeout?: number
 }
 
 interface DesktopNotificationRouterOptions extends DesktopNotificationOptions {
@@ -33,6 +34,9 @@ const ALERTER_INSTALL_HINT =
 
 export function buildAlerterArguments(options: DesktopNotificationOptions): string[] {
 	const argv = ["alerter", "--message", options.message, "--title", options.title]
+	if (options.timeout !== undefined) {
+		argv.push("--timeout", String(options.timeout))
+	}
 
 	if (options.subtitle) {
 		argv.push("--subtitle", options.subtitle)
@@ -47,6 +51,17 @@ export function buildAlerterArguments(options: DesktopNotificationOptions): stri
 	}
 
 	return argv
+}
+
+export function buildNodeNotifierOptions(
+	options: DesktopNotificationOptions,
+): Record<string, unknown> {
+	return {
+		title: options.title,
+		message: options.message,
+		sound: options.sound,
+		timeout: options.timeout,
+	}
 }
 
 export async function sendMacOSAlerterNotification(
